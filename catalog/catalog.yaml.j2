@@ -15,7 +15,7 @@ metadata:
   description: ACME Bank financial guidance application with Keycloak sign-in and private history. Scripted demonstration; no live AI.
   tags: [quarkus, java, banking]
   annotations:
-    backstage.io/source-location: url:https://github.com/relessawy/wealthwise-demo
+    backstage.io/source-location: url:https://github.com/relessawy/wealthwise-demo/tree/{{ source_ref }}
   links:
   - title: Open WealthWise
     url: '{{ application_url }}'
@@ -24,7 +24,7 @@ metadata:
     url: '{{ application_url }}/q/swagger-ui/'
     icon: dashboard
   - title: Implementation handover
-    url: https://github.com/relessawy/wealthwise-demo/blob/main/docs/IMPLEMENTATION.md
+    url: https://github.com/relessawy/wealthwise-demo/blob/{{ source_ref }}/docs/IMPLEMENTATION.md
     icon: docs
 spec:
   type: website

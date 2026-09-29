@@ -9,7 +9,7 @@ def main():
     s=get('secret',pname+'-bitbucket',pns)
     assert s['metadata'].get('labels',{}).get('demo-library.io/owner')=='developer-hub-foundation','Unrecognized integration ownership'
     d={k:base64.b64decode(v).decode() for k,v in s['data'].items()}
-    values={'workspace':d['workspace'],'email':d['email'],'api_token':d['api-token'],
+    values={'source_ref':'v'+(ROOT/'VERSION').read_text().strip(),'workspace':d['workspace'],'email':d['email'],'api_token':d['api-token'],
         'seed_repository':d['template-url'].split('/')[4],
         'application_url':'https://'+get('route','wealthwise',NS)['spec']['host']}
     remote='/work/catalog-onboarding'

@@ -74,7 +74,7 @@ Automated checks cover code flow/PKCE, Alice/Bob identities, separate history, f
 
 Application source remains authoritative in the private `wealthwise-demo` GitHub repository. Ansible publishes only a generated `catalog-info.yaml` and README to a separate private `wealthwise-demo-catalog` repository in the portal's configured Bitbucket workspace/project. This is a catalog delivery artifact, not a second application implementation. It contains URLs and the public API contract, never credentials.
 
-The versioned Jinja template is `catalog/catalog.yaml.j2`; `deploy/catalog.yml` supplies actual environment values and reads the deployed OpenAPI document. Registration is idempotent for the exact location URL. Repeat publication compares content before committing. The catalog is stored persistently by the existing portal; foundation recreation requires rerunning `bash demo onboard`.
+Catalog source and handover links are pinned to the release in `VERSION`. The versioned Jinja template is `catalog/catalog.yaml.j2`; `deploy/catalog.yml` supplies actual environment values and reads the deployed OpenAPI document. Registration is idempotent for the exact location URL. Repeat publication compares content before committing. The catalog is stored persistently by the existing portal; foundation recreation requires rerunning `bash demo onboard`.
 
 No TechDocs, CI, topology, Quay or Argo CD annotations are added to imply unfinished integrations. The handover and application links work independently of those later plugins. The existing generic Jenkins template remains available and unchanged.
 
