@@ -51,6 +51,7 @@ class WwHistory extends LitElement {
         };
         this.ajax.open("GET", "/api/history", true);
         this.ajax.setRequestHeader("Content-Type", "application/json");
+        this.ajax.setRequestHeader("X-Requested-With", "XMLHttpRequest");
         this.ajax.send();
     }
 

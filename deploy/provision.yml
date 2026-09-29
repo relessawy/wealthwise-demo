@@ -51,30 +51,16 @@
   - name: Reuse shared PostgreSQL role
     ansible.builtin.include_role:
       name: postgres
-  - name: Inspect access Secret
+  - name: Inspect preconfigured application OIDC Secret
     kubernetes.core.k8s_info:
       kind: Secret
-      name: wealthwise-access
+      name: wealthwise-oidc
       namespace: '{{ workload_namespace }}'
-    register: access
+    register: oidc
     no_log: true
-  - name: Check access Secret ownership
+  - name: Require owned identity configuration
     ansible.builtin.assert:
-      that: access.resources | length == 0 or access.resources[0].metadata.labels.get('demo-library.io/owner','') == owner
-    no_log: true
-  - name: Generate qualification credentials once
-    kubernetes.core.k8s:
-      definition:
-        apiVersion: v1
-        kind: Secret
-        metadata:
-          name: wealthwise-access
-          namespace: '{{ workload_namespace }}'
-          labels: {demo-library.io/owner: '{{ owner }}'}
-        stringData:
-          username: demo
-          password: '{{ lookup("ansible.builtin.password", "/dev/null", length=32) }}'
-    when: access.resources | length == 0
+      that: oidc.resources | length == 1 and oidc.resources[0].metadata.labels.get('demo-library.io/owner','') == owner
     no_log: true
   - name: Deploy application
     kubernetes.core.helm:

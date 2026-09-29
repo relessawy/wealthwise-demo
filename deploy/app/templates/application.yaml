@@ -33,10 +33,12 @@ spec:
         env:
         - {name: JAVA_OPTS_APPEND, value: '-XX:MaxRAMPercentage=70.0'}
         {{- if eq $name "ww-frontend" }}
-        - name: DEMO_USER
-          valueFrom: {secretKeyRef: {name: wealthwise-access, key: username}}
-        - name: DEMO_PASSWORD
-          valueFrom: {secretKeyRef: {name: wealthwise-access, key: password}}
+        - name: OIDC_ISSUER
+          valueFrom: {secretKeyRef: {name: wealthwise-oidc, key: issuer}}
+        - name: OIDC_CLIENT_ID
+          valueFrom: {secretKeyRef: {name: wealthwise-oidc, key: client-id}}
+        - name: OIDC_CLIENT_SECRET
+          valueFrom: {secretKeyRef: {name: wealthwise-oidc, key: client-secret}}
         {{- end }}
         {{- if eq $name "advisor-history" }}
         - {name: DB_USER, value: wealthwise}

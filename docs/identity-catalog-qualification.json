@@ -1,0 +1,95 @@
+{
+  "application": {
+    "status": "VERIFIED",
+    "checked_at": "2026-09-29T09:20:50Z",
+    "checks": [
+      "anonymous API denied",
+      "forged bearer denied",
+      "Alice authorization code with PKCE",
+      "Bob authorization code with PKCE",
+      "authenticated callback fallback returns home",
+      "anonymous callback remains protected",
+      "distinct verified subjects",
+      "scripted financial answer",
+      "idempotent retry",
+      "conflicting retry denied",
+      "one Alice history row",
+      "Bob cannot read Alice history",
+      "same request ID permitted for another user",
+      "spoofed owner ignored",
+      "investment Conservative",
+      "investment Balanced",
+      "investment Aggressive",
+      "invalid investment denied",
+      "empty question denied",
+      "invalid pagination denied",
+      "secure HttpOnly session cookie",
+      "OpenAPI documents bearer authentication",
+      "logout delegates to correct identity provider",
+      "provider ends session",
+      "logged out session cannot read history"
+    ],
+    "namespace": "wealthwise-demo",
+    "persistence_request_id": "f1752475-7063-4ade-bde7-573fecaa2000"
+  },
+  "catalog": {
+    "status": "VERIFIED",
+    "entities": [
+      "system:default/wealthwise",
+      "component:default/wealthwise",
+      "component:default/wealthwise-financial-advisor",
+      "component:default/wealthwise-investment-advisor",
+      "component:default/wealthwise-history",
+      "resource:default/wealthwise-postgresql",
+      "api:default/wealthwise-api"
+    ],
+    "alice_access": "VERIFIED",
+    "location": "https://bitbucket.org/relessaw_demo/wealthwise-demo-catalog/src/main/catalog-info.yaml",
+    "portal": "https://wnzl-developer-hub.apps.cluster-gwmg9.dyn.redhatworkshops.io/catalog/default/component/wealthwise"
+  },
+  "java_tests": {
+    "passed": 13,
+    "failures": 0,
+    "errors": 0
+  },
+  "source_transfer_test": "PASSED",
+  "identity_repeat": {
+    "ok": 13,
+    "changed": 0,
+    "failed": 0
+  },
+  "application_repeat": {
+    "ok": 14,
+    "changed": 0,
+    "failed": 0
+  },
+  "portal_compatibility_repeat": {
+    "ok": 5,
+    "changed": 0,
+    "failed": 0
+  },
+  "catalog_repeat": {
+    "ok": 7,
+    "changed": 0,
+    "failed": 0
+  },
+  "browser_journey": {
+    "status": "VERIFIED_ALICE",
+    "date": "2026-09-29",
+    "checks": [
+      "Signed in as alice",
+      "Financial question returned scripted answer",
+      "Balanced scenario returned illustrative result",
+      "Both activities visible in History",
+      "Protected callback returned home with Alice session",
+      "Developer Hub API tab and Swagger operations rendered"
+    ],
+    "limitations": [
+      "Bob isolation verified by protocol tests, not a second interactive browser walkthrough",
+      "Portal cross-origin Try it out not tested"
+    ]
+  },
+  "original_source": "UNCHANGED",
+  "framework_pr": "https://github.com/relessawy/Demo-Library/pull/73",
+  "framework_merge": "12face8c45b7b95663603e663738db3969b0e049"
+}

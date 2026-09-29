@@ -2,6 +2,7 @@
 """Thin OpenShift transport/build launcher; deployment logic lives in Ansible/Helm."""
 import json, os, pathlib, subprocess, tarfile, tempfile, time, sys
 from transport import source_paths
+from identity import configure
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 OC=os.environ.get("OC","oc"); NS=os.environ.get("WEALTHWISE_NAMESPACE","wealthwise-demo")
 OWNER="wealthwise-demo"; POD="wealthwise-tools"
@@ -44,10 +45,18 @@ with tempfile.TemporaryDirectory() as tmp:
   for f in source_paths(ROOT,include_build=local_build):
    tar.add(f,arcname=str(f.relative_to(ROOT)))
  with archive.open("rb") as stream:subprocess.run([OC,"exec","-i","-n",NS,POD,"-c","runner","--","tar","xzf","-","-C",remote],stdin=stream,check=True)
+configure(OC,NS,remote)
 if not local_build:
  ex("mvn","-B","-ntp","-f",remote+"/pom.xml","-Dmaven.repo.local=/work/m2","verify",container="maven")
 images={}
+selected=set(os.environ.get("WEALTHWISE_BUILD_MODULES", ",".join(MODULES)).split(","))
+if not selected or not selected.issubset(MODULES): raise SystemExit("Invalid WEALTHWISE_BUILD_MODULES")
 for module in MODULES:
+ if module not in selected:
+  ref=oc("get","imagestreamtag",module+":baseline","-n",NS,"-o","jsonpath={.image.dockerImageReference}").decode()
+  if "@sha256:" not in ref:raise SystemExit("No qualified image to reuse for "+module+"; run without WEALTHWISE_BUILD_MODULES")
+  images[module]=ref
+  continue
  apply({"apiVersion":"image.openshift.io/v1","kind":"ImageStream","metadata":{"name":module,"namespace":NS}})
  dockerfile=(ROOT/"Containerfile").read_text()
  apply({"apiVersion":"build.openshift.io/v1","kind":"BuildConfig","metadata":{"name":module,"namespace":NS},"spec":{"runPolicy":"Serial","source":{"type":"Binary","binary":{},"dockerfile":dockerfile},"strategy":{"type":"Docker","dockerStrategy":{}},"output":{"to":{"kind":"ImageStreamTag","name":module+":baseline"}},"resources":{"requests":{"cpu":"100m","memory":"256Mi"},"limits":{"cpu":"1","memory":"1Gi"}}}})
@@ -68,4 +77,4 @@ ex("sh","-c",'cd "$1/deploy" && ansible-playbook provision.yml -e @run-values.js
 route=oc("get","route","wealthwise","-n",NS,"-o","jsonpath={.spec.host}").decode()
 evidence=ROOT/".private"/"runs"/run;evidence.mkdir(parents=True,exist_ok=True);os.chmod(ROOT/".private",0o700)
 (evidence/"deployment.json").write_text(json.dumps({"namespace":NS,"url":"https://"+route,"images":images,"run":run},indent=2))
-print("Application: https://"+route);print("Credentials: Secret wealthwise-access in namespace "+NS);print("Evidence:",evidence)
+print("Application: https://"+route);print("Application identity: Keycloak via wealthwise-oidc in namespace "+NS);print("Evidence:",evidence)

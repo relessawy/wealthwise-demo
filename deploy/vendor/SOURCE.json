@@ -18,5 +18,13 @@
     "roles/postgres/tasks/client-secret.yml": "4cb426a8a1de34fd62d537a1866472f9c65ca5cda36b1158bdd67f4f00082944",
     "roles/postgres/tasks/main.yml": "2772ea84afd670b3a6865603f7cecebdb339aab211eb68edcb9c2e25cd321275",
     "roles/postgres/defaults/main.yml": "a3ac47448bf028eab937f7336eb62bd74caead253066d2fa2effa359d5177e9d"
+  },
+  "additional_exports": {
+    "verification/portal_identity.py": {
+      "repository": "https://github.com/relessawy/Demo-Library",
+      "commit": "bbb38a68a41919ae4a2644271e650fbda68c26f4",
+      "path": "automation/verification/portal_identity.py",
+      "sha256": "8606c1789f3cf6e4cab213ed4975444269fc4f3b724bb5b6f5feceabf1a25213"
+    }
   }
 }

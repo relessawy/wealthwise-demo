@@ -1,0 +1,141 @@
+- name: Configure only the WealthWise client in an existing Keycloak realm
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    owner: wealthwise-demo
+  tasks:
+  - name: Validate exact application and identity URLs
+    ansible.builtin.assert:
+      that:
+      - identity_url is match('^https://[a-zA-Z0-9.-]+$')
+      - application_url is match('^https://[a-zA-Z0-9.-]+$')
+      - identity_realm is match('^[a-zA-Z0-9_-]+$')
+      - client_id is match('^[a-zA-Z0-9_-]+$')
+  - name: Authenticate administrative service for this reconciliation
+    ansible.builtin.uri:
+      url: '{{ identity_url }}/realms/master/protocol/openid-connect/token'
+      method: POST
+      body_format: form-urlencoded
+      body:
+        grant_type: client_credentials
+        client_id: '{{ bootstrap_client_id }}'
+        client_secret: '{{ bootstrap_client_secret }}'
+    register: admin_token
+    no_log: true
+  - name: Set private API headers
+    ansible.builtin.set_fact:
+      admin_headers: {Authorization: 'Bearer {{ admin_token.json.access_token }}'}
+    no_log: true
+  - name: Require existing realm without changing it
+    ansible.builtin.uri:
+      url: '{{ identity_url }}/realms/{{ identity_realm }}/.well-known/openid-configuration'
+    register: discovery
+  - name: Require expected issuer
+    ansible.builtin.assert:
+      that: discovery.json.issuer == identity_url + '/realms/' + identity_realm
+  - name: Inspect application client
+    ansible.builtin.uri:
+      url: '{{ identity_url }}/admin/realms/{{ identity_realm }}/clients?clientId={{ client_id }}'
+      headers: '{{ admin_headers }}'
+    register: clients
+    no_log: true
+  - name: Inspect application Secret
+    kubernetes.core.k8s_info:
+      kind: Secret
+      namespace: '{{ workload_namespace }}'
+      name: wealthwise-oidc
+    register: credential
+    no_log: true
+  - name: Refuse unrelated client or Secret
+    ansible.builtin.assert:
+      that:
+      - clients.json | length <= 1
+      - clients.json | length == 0 or clients.json[0].attributes.get('demo-library-owner','') == owner
+      - credential.resources | length == 0 or credential.resources[0].metadata.labels.get('demo-library.io/owner','') == owner
+      - clients.json | length == 0 or credential.resources | length == 1
+    no_log: true
+  - name: Retain application credential or generate it once
+    ansible.builtin.set_fact:
+      client_secret: '{{ (credential.resources[0].data["client-secret"] | b64decode) if credential.resources | length else lookup("ansible.builtin.password", "/dev/null", length=48, chars=["ascii_letters","digits"]) }}'
+    no_log: true
+  - name: Define constrained client
+    ansible.builtin.set_fact:
+      client_body:
+        clientId: '{{ client_id }}'
+        protocol: openid-connect
+        enabled: true
+        publicClient: false
+        standardFlowEnabled: true
+        implicitFlowEnabled: false
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        secret: '{{ client_secret }}'
+        redirectUris: ['{{ application_url }}/oidc/callback']
+        webOrigins: ['{{ application_url }}']
+        attributes:
+          demo-library-owner: '{{ owner }}'
+          pkce.code.challenge.method: S256
+          post.logout.redirect.uris: '{{ application_url }}/'
+        protocolMappers:
+        - name: wealthwise-audience
+          protocol: openid-connect
+          protocolMapper: oidc-audience-mapper
+          config:
+            included.client.audience: '{{ client_id }}'
+            access.token.claim: 'true'
+            id.token.claim: 'false'
+    no_log: true
+  - name: Reconcile owned application client
+    ansible.builtin.uri:
+      url: '{{ identity_url }}/admin/realms/{{ identity_realm }}/clients{{ "/" + clients.json[0].id if clients.json | length else "" }}'
+      method: '{{ "PUT" if clients.json | length else "POST" }}'
+      headers: '{{ admin_headers }}'
+      body_format: json
+      body: '{{ client_body }}'
+      status_code: [201, 204]
+    when: >-
+      clients.json | length == 0 or
+      clients.json[0].redirectUris != client_body.redirectUris or
+      clients.json[0].webOrigins != client_body.webOrigins or
+      clients.json[0].publicClient or
+      not clients.json[0].standardFlowEnabled or
+      clients.json[0].implicitFlowEnabled or
+      clients.json[0].directAccessGrantsEnabled or
+      clients.json[0].serviceAccountsEnabled or
+      clients.json[0].attributes.get('pkce.code.challenge.method','') != 'S256' or
+      clients.json[0].attributes.get('post.logout.redirect.uris','') != application_url + '/' or
+      (clients.json[0].protocolMappers | default([]) | selectattr('name','equalto','wealthwise-audience') | map(attribute='config') | list) != [client_body.protocolMappers[0].config]
+    changed_when: true
+    no_log: true
+  - name: Deliver application-only identity configuration
+    kubernetes.core.k8s:
+      definition:
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: wealthwise-oidc
+          namespace: '{{ workload_namespace }}'
+          labels: {demo-library.io/owner: '{{ owner }}'}
+        stringData:
+          issuer: '{{ discovery.json.issuer }}'
+          client-id: '{{ client_id }}'
+          client-secret: '{{ client_secret }}'
+    no_log: true
+  - name: Read client acceptance state
+    ansible.builtin.uri:
+      url: '{{ identity_url }}/admin/realms/{{ identity_realm }}/clients?clientId={{ client_id }}'
+      headers: '{{ admin_headers }}'
+    register: observed
+    no_log: true
+  - name: Verify client security boundaries
+    ansible.builtin.assert:
+      that:
+      - observed.json | length == 1
+      - observed.json[0].redirectUris == client_body.redirectUris
+      - not observed.json[0].publicClient
+      - not observed.json[0].directAccessGrantsEnabled
+      - not observed.json[0].implicitFlowEnabled
+      - not observed.json[0].serviceAccountsEnabled
+      - observed.json[0].attributes['pkce.code.challenge.method'] == 'S256'
+    no_log: true
