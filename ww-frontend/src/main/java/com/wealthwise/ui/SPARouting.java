@@ -20,6 +20,8 @@ public class SPARouting {
               final String path = rc.normalizedPath();
               if (!path.startsWith("/api/")
                   && !path.startsWith("/q/")
+                  && !path.startsWith("/oidc/")
+                  && !path.equals("/logout")
                   && !path.equals("/")
                   && !FILE_NAME_PREDICATE.test(path)) {
                 rc.reroute("/");

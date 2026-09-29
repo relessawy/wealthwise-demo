@@ -1,50 +1,99 @@
 #!/usr/bin/env python3
-"""Exercise the public API without printing or persisting credentials."""
-import os,json,subprocess,base64,urllib.request,urllib.error,urllib.parse,uuid,pathlib,time,http.cookiejar
-root=pathlib.Path(__file__).resolve().parents[1];ns=os.environ.get("WEALTHWISE_NAMESPACE","wealthwise-demo");oc=os.environ.get("OC","oc")
-def get(kind,name):return json.loads(subprocess.check_output([oc,"--request-timeout=30s","get",kind,name,"-n",ns,"-o","json"]))
-url="https://"+get("route","wealthwise")["spec"]["host"]
-s=get("secret","wealthwise-access")["data"];user=base64.b64decode(s["username"]).decode();password=base64.b64decode(s["password"]).decode();auth="Basic "+base64.b64encode((user+":"+password).encode()).decode()
-checks=[]
-def call(path,data=None,credentials=auth):
- headers={"Content-Type":"application/json"}
- if credentials:headers["Authorization"]=credentials
- req=urllib.request.Request(url+path,data=json.dumps(data).encode() if data is not None else None,headers=headers)
- try:
-  with urllib.request.urlopen(req,timeout=25) as r:return r.status,json.loads(r.read())
- except urllib.error.HTTPError as e:return e.code,None
+"""Live OIDC protocol and application acceptance; never logs passwords or tokens.
+Uses the normal authorization-code login flow with PKCE, not password grants.
+"""
+import base64, json, os, pathlib, subprocess, time, uuid, sys
+from html.parser import HTMLParser
+from urllib.parse import urljoin, urlsplit
+import requests
+ROOT=pathlib.Path(__file__).resolve().parents[1]
+OC=os.environ.get('OC','oc'); NS=os.environ.get('WEALTHWISE_NAMESPACE','wealthwise-demo')
+class Form(HTMLParser):
+    def __init__(self): super().__init__(); self.action=None
+    def handle_starttag(self,tag,attrs):
+        a=dict(attrs)
+        if tag=='form' and a.get('id')=='kc-form-login': self.action=a.get('action')
+def get(kind,name,namespace):
+    return json.loads(subprocess.check_output([OC,'get',kind,name,'-n',namespace,'-o','json']))
+def login(url,issuer,username,password):
+    s=requests.Session()
+    r=s.get(url+'/api/session',timeout=30,allow_redirects=False)
+    target=r.headers.get('Location','')
+    assert r.status_code==302 and urlsplit(target)[:2]==urlsplit(issuer)[:2], 'Unexpected OIDC challenge'
+    assert 'code_challenge=' in target and 'code_challenge_method=S256' in target, 'PKCE missing'
+    r=s.get(target,timeout=30,allow_redirects=False)
+    form=Form();form.feed(r.text)
+    assert r.status_code==200 and form.action and urlsplit(form.action)[:2]==urlsplit(issuer)[:2], 'Unexpected credential destination'
+    r=s.post(form.action,data={'username':username,'password':password,'credentialId':''},timeout=30,allow_redirects=False)
+    target=r.headers.get('Location','')
+    assert r.status_code in (302,303) and target.split('?',1)[0]==url+'/oidc/callback', 'Identity login rejected'
+    for _ in range(5):
+        assert urlsplit(target)[:2]==urlsplit(url)[:2], 'Unexpected callback destination'
+        r=s.get(target,timeout=30,allow_redirects=False)
+        if r.status_code==200: break
+        assert r.status_code in (302,303), 'Callback failed'
+        target=urljoin(url,r.headers['Location'])
+    assert r.status_code==200,'Code flow not completed'
+    return s
 
-def check(name,truth):
- if not truth:raise SystemExit("FAIL: "+name)
- checks.append(name);print("PASS:",name)
-check("anonymous history rejected",call("/api/history",credentials=None)[0]==401)
-check("incorrect credential rejected",call("/api/history",credentials="Basic Zm9vOmJhcg==")[0]==401)
-id=str(uuid.uuid4());body={"message":"How can I plan my household budget?","requestId":id}
-status,response=call("/api/financial/chat",body);check("financial response explicitly scripted",status==200 and response.get("mode")=="demonstration" and "not live AI" in response["message"])
-check("retry succeeds",call("/api/financial/chat",body)[0]==200)
-check("conflicting retry rejected",call("/api/financial/chat",{"message":"different question","requestId":id})[0]==409)
-status,h=call("/api/history");check("one persisted row after retry",status==200 and sum(x["requestId"]==id for x in h["message"])==1)
-for risk in ("Conservative","Balanced","Aggressive"):
- status,response=call("/api/investment/chat",{"message":risk,"requestId":str(uuid.uuid4())});check("investment "+risk,status==200 and "Demonstration" in response["message"])
-check("invalid investment rejected",call("/api/investment/chat",{"message":"INVALID","requestId":str(uuid.uuid4())})[0]==400)
-check("empty financial question rejected",call("/api/financial/chat",{"message":"","requestId":str(uuid.uuid4())})[0]==400)
-check("invalid history page rejected",call("/api/history?limit=1000")[0]==400)
-check("missing request identity rejected",call("/api/financial/chat",{"message":"budget"})[0]==400)
-# Spoofed incoming headers are ignored: frontend derives identity from authenticated account.
-req=urllib.request.Request(url+"/api/history",headers={"Authorization":auth,"X-Demo-User":"another-user"})
-with urllib.request.urlopen(req,timeout=25) as resp:data=json.load(resp)
-check("client cannot override history identity",any(x["requestId"]==id for x in data["message"]))
-jar=http.cookiejar.CookieJar()
-form_client=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
-form=urllib.parse.urlencode({"j_username":user,"j_password":password}).encode()
-with form_client.open(urllib.request.Request(url+"/j_security_check",data=form),timeout=25) as response:
- check("form sign-in succeeds",response.status==200)
-with form_client.open(url+"/api/history",timeout=25) as response:
- check("form session authorizes API",response.status==200)
-cookie=next((c for c in jar if c.name=="quarkus-credential"),None)
-check("form cookie protections",cookie is not None and cookie.secure and "httponly" in {k.lower() for k in cookie._rest} and cookie._rest.get("SameSite","").lower()=="strict")
-with urllib.request.urlopen(url+"/q/openapi?format=json",timeout=25) as response: spec=json.load(response)
-check("OpenAPI documents protected application endpoints","/api/financial/chat" in spec["paths"] and "/api/history" in spec["paths"] and spec["components"]["securitySchemes"]["demo"]["scheme"]=="basic")
-out=root/".private"/"acceptance";out.mkdir(parents=True,exist_ok=True);os.chmod(root/".private",0o700)
-(out/"latest.json").write_text(json.dumps({"status":"VERIFIED","checked_at":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),"checks":checks,"persistence_request_id":id,"namespace":ns},indent=2))
-print("Acceptance evidence:",out/"latest.json")
+def main():
+    checks=[]
+    def check(name,ok):
+        if not ok: raise RuntimeError(name)
+        checks.append(name);print('PASS:',name)
+    if '--stdin' in sys.argv:
+        config=json.load(sys.stdin);url=config['url'];issuer=config['issuer'];personas=config['personas']
+    else:
+        url='https://'+get('route','wealthwise',NS)['spec']['host']
+        oidc=get('secret','wealthwise-oidc',NS)['data'];issuer=base64.b64decode(oidc['issuer']).decode()
+        identity_ns=os.environ.get('IDENTITY_NAMESPACE',''); identity_name=os.environ.get('IDENTITY_NAME','')
+        if not identity_ns or not identity_name: raise RuntimeError('Set IDENTITY_NAMESPACE and IDENTITY_NAME for persona acceptance')
+        personas=get('secret',identity_name+'-personas',identity_ns)['data']
+    anon=requests.get(url+'/api/history',headers={'X-Requested-With':'XMLHttpRequest'},timeout=30,allow_redirects=False)
+    check('anonymous API denied',anon.status_code in (401,499))
+    forged=requests.get(url+'/api/history',headers={'Authorization':'Bearer invalid'},timeout=30,allow_redirects=False)
+    check('forged bearer denied',forged.status_code==401)
+    alice=login(url,issuer,'alice',base64.b64decode(personas['alice']).decode())
+    bob=login(url,issuer,'bob',base64.b64decode(personas['bob']).decode())
+    check('Alice authorization code with PKCE',alice.get(url+'/api/me',timeout=30).json()['username']=='alice')
+    check('Bob authorization code with PKCE',bob.get(url+'/api/me',timeout=30).json()['username']=='bob')
+    check('distinct verified subjects',alice.get(url+'/api/me',timeout=30).json()['identity']!=bob.get(url+'/api/me',timeout=30).json()['identity'])
+    def post(s,path,body):return s.post(url+path,json=body,headers={'X-Requested-With':'XMLHttpRequest'},timeout=30,allow_redirects=False)
+    rid=str(uuid.uuid4());body={'message':'How can I plan my household budget?','requestId':rid}
+    r=post(alice,'/api/financial/chat',body)
+    check('scripted financial answer',r.status_code==200 and r.json()['mode']=='demonstration')
+    check('idempotent retry',post(alice,'/api/financial/chat',body).status_code==200)
+    check('conflicting retry denied',post(alice,'/api/financial/chat',{'message':'different','requestId':rid}).status_code==409)
+    a=alice.get(url+'/api/history',timeout=30).json()['message']
+    b=bob.get(url+'/api/history',timeout=30).json()['message']
+    check('one Alice history row',sum(x['requestId']==rid for x in a)==1)
+    check('Bob cannot read Alice history',all(x['requestId']!=rid for x in b))
+    check('same request ID permitted for another user',post(bob,'/api/financial/chat',{'message':'Bob budget','requestId':rid}).status_code==200)
+    b=bob.get(url+'/api/history',headers={'X-Demo-User':alice.get(url+'/api/me',timeout=30).json()['identity']},timeout=30).json()['message']
+    check('spoofed owner ignored',any(x['requestId']==rid and x['question']=='Bob budget' for x in b) and all(x['question']!='How can I plan my household budget?' for x in b if x['requestId']==rid))
+    for risk in ('Conservative','Balanced','Aggressive'):
+        r=post(alice,'/api/investment/chat',{'message':risk,'requestId':str(uuid.uuid4())})
+        check('investment '+risk,r.status_code==200 and 'Demonstration' in r.json()['message'])
+    check('invalid investment denied',post(alice,'/api/investment/chat',{'message':'INVALID','requestId':str(uuid.uuid4())}).status_code==400)
+    check('empty question denied',post(alice,'/api/financial/chat',{'message':'','requestId':str(uuid.uuid4())}).status_code==400)
+    check('invalid pagination denied',alice.get(url+'/api/history?limit=1000',timeout=30).status_code==400)
+    cookie=next((c for c in alice.cookies if c.name.startswith('q_session')),None)
+    check('secure HttpOnly session cookie',cookie is not None and cookie.secure and 'httponly' in {k.lower() for k in cookie._rest})
+    spec=requests.get(url+'/q/openapi?format=json',timeout=30).json()
+    check('OpenAPI documents bearer authentication',spec['components']['securitySchemes']['oidc']['scheme']=='bearer')
+    r=alice.get(url+'/logout',timeout=30,allow_redirects=False)
+    target=r.headers.get('Location','')
+    check('logout delegates to correct identity provider',r.status_code==302 and urlsplit(target)[:2]==urlsplit(issuer)[:2] and '/logout' in urlsplit(target).path)
+    r=alice.get(target,timeout=30,allow_redirects=False)
+    check('provider ends session',r.status_code in (200,302,303))
+    r=alice.get(url+'/api/history',headers={'X-Requested-With':'XMLHttpRequest'},timeout=30,allow_redirects=False)
+    check('logged out session cannot read history',r.status_code in (401,499))
+    out=ROOT/'.private/acceptance';out.mkdir(parents=True,exist_ok=True)
+    (out/'oidc.json').write_text(json.dumps({'status':'VERIFIED','checked_at':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'checks':checks,'namespace':NS,'persistence_request_id':rid},indent=2))
+    print('OIDC acceptance evidence:',out/'oidc.json')
+if __name__=='__main__':
+    try: main()
+    except Exception as exc:
+        # Avoid printing response bodies, cookies or URLs containing authorization codes.
+        print('OIDC acceptance failed:',str(exc) if isinstance(exc,(AssertionError,RuntimeError)) else type(exc).__name__)
+        raise SystemExit(1)

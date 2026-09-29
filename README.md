@@ -2,7 +2,7 @@
 
 A private adaptation of WealthWise for a fictional ACME Bank. The original application is unchanged. The existing Lit/Vaadin interface is retained, with four independently deployable Quarkus services and a dedicated PostgreSQL database.
 
-## Baseline story
+## Demo story
 
 Sign in to the demonstration, ask a financial-planning question, select an illustrative investment risk mix, and view persisted history. Responses are deterministic and clearly labelled. **No live AI, model account, Kafka, Serverless or GPU is required.** This is synthetic training material, not a financial-advice product.
 
@@ -19,19 +19,21 @@ The frontend uses same-origin APIs; backend Services have no external Routes. Ne
 See [the implementation handover](docs/IMPLEMENTATION.md) for prerequisites and the complete procedure. With `oc` authenticated, Python 3, and the qualified automation runner image configured:
 
 ```bash
-export RUNNER_IMAGE='<qualified-runner-image>@sha256:<digest>'
+# Configure identity, portal and runner values using docs/IMPLEMENTATION.md.
 bash demo
 ```
 
-The default command builds/tests in an OpenShift tools pod, builds container images, invokes Ansible/Helm and checks the public API. You do not install Ansible, Galaxy collections, Maven or Java on your laptop. `bash demo verify` repeats API acceptance; `bash demo build` is an optional developer-local Maven build.
+The default command builds/tests in an OpenShift tools pod, builds container images, invokes Ansible/Helm checks Keycloak login/user isolation, and publishes/registers the catalog and API. You do not install Ansible, Galaxy collections, Maven or Java on your laptop. `bash demo verify` repeats API acceptance; `bash demo build` is an optional developer-local Maven build.
 
 Private credentials and execution records stay under `.private/` and in cluster Secrets. Never commit them.
 
 ## Scope and gates
 
-Read [VALIDATION.md](VALIDATION.md) for observed evidence and pending checks. Baseline authentication is a **single generated demonstration account**, not the final Keycloak persona integration. Static UI files are public; application APIs require credentials (Quarkus form login with an encrypted HttpOnly session cookie; Basic authentication is also supported for automated checks). History owner identity is supplied by the authenticated frontend and trusted only on restricted internal service links. Cluster administrators remain trusted.
+Read [VALIDATION.md](VALIDATION.md) for observed evidence and pending checks. WealthWise uses the existing Keycloak realm through a separate confidential client with PKCE. Alice and Bob have separate history, bound to their verified issuer/subject. Static UI files are public; APIs require an OIDC session or valid token. Sign out ends the shared identity session. The old generated `demo` account is no longer active.
 
-The next milestones are application Keycloak login, portal template/catalog/API/TechDocs/workspace integration, multi-service Jenkins/SonarQube publication, image/SBOM/provenance delivery and GitOps/Service Mesh exercises. No claim is made that these later integrations are active for WealthWise yet. Live AI is an optional future provider, never a silent fallback.
+Developer Hub contains the WealthWise system, four components, PostgreSQL Resource and real API contract. Generated catalog metadata lives in a private Bitbucket repository; application source remains here. Consultant commands and native assets are in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
+
+Software-template creation, TechDocs/workspaces, multi-service Jenkins/SonarQube, image/SBOM/provenance and GitOps/mesh remain subsequent milestones. Live AI is optional future work, never a silent fallback.
 
 ## Source ownership
 

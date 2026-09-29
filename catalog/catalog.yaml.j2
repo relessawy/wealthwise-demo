@@ -1,0 +1,74 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: wealthwise
+  title: WealthWise Banking Demonstration
+  description: Financial guidance, investment scenarios and private user history.
+spec:
+  owner: group:default/developers
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: wealthwise
+  title: WealthWise
+  description: ACME Bank financial guidance application with Keycloak sign-in and private history. Scripted demonstration; no live AI.
+  tags: [quarkus, java, banking]
+  annotations:
+    backstage.io/source-location: url:https://github.com/relessawy/wealthwise-demo
+  links:
+  - title: Open WealthWise
+    url: '{{ application_url }}'
+    icon: web
+  - title: Interactive API explorer
+    url: '{{ application_url }}/q/swagger-ui/'
+    icon: dashboard
+  - title: Implementation handover
+    url: https://github.com/relessawy/wealthwise-demo/blob/main/docs/IMPLEMENTATION.md
+    icon: docs
+spec:
+  type: website
+  lifecycle: experimental
+  owner: group:default/developers
+  system: wealthwise
+  providesApis: [wealthwise-api]
+  dependsOn: [component:wealthwise-financial-advisor, component:wealthwise-investment-advisor, component:wealthwise-history]
+{% for name, title in [('financial-advisor','Financial Advisor'), ('investment-advisor','Investment Scenarios'), ('history','Private History')] %}
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: wealthwise-{{ name }}
+  title: WealthWise {{ title }}
+  description: Internal WealthWise service; access through the authenticated frontend.
+spec:
+  type: service
+  lifecycle: experimental
+  owner: group:default/developers
+  system: wealthwise
+  dependsOn: [{{ 'resource:wealthwise-postgresql' if name == 'history' else 'component:wealthwise-history' }}]
+{% endfor %}
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: wealthwise-postgresql
+  title: WealthWise PostgreSQL
+spec:
+  type: database
+  owner: group:default/developers
+  system: wealthwise
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: wealthwise-api
+  title: WealthWise API
+  description: Authenticated financial guidance, investment scenarios and per-user history.
+spec:
+  type: openapi
+  lifecycle: experimental
+  owner: group:default/developers
+  system: wealthwise
+  definition: |
+    {{ openapi.json | combine({"servers":[{"url":application_url}]}) | to_nice_json | indent(4) }}

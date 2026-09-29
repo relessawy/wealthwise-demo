@@ -1,0 +1,78 @@
+{
+  "application": {
+    "status": "VERIFIED",
+    "checked_at": "2026-09-29T08:52:21Z",
+    "checks": [
+      "anonymous API denied",
+      "forged bearer denied",
+      "Alice authorization code with PKCE",
+      "Bob authorization code with PKCE",
+      "distinct verified subjects",
+      "scripted financial answer",
+      "idempotent retry",
+      "conflicting retry denied",
+      "one Alice history row",
+      "Bob cannot read Alice history",
+      "same request ID permitted for another user",
+      "spoofed owner ignored",
+      "investment Conservative",
+      "investment Balanced",
+      "investment Aggressive",
+      "invalid investment denied",
+      "empty question denied",
+      "invalid pagination denied",
+      "secure HttpOnly session cookie",
+      "OpenAPI documents bearer authentication",
+      "logout delegates to correct identity provider",
+      "provider ends session",
+      "logged out session cannot read history"
+    ],
+    "namespace": "wealthwise-demo",
+    "persistence_request_id": "afb69d03-2cb5-4797-b91f-50b7b110700a"
+  },
+  "catalog": {
+    "status": "VERIFIED",
+    "entities": [
+      "system:default/wealthwise",
+      "component:default/wealthwise",
+      "component:default/wealthwise-financial-advisor",
+      "component:default/wealthwise-investment-advisor",
+      "component:default/wealthwise-history",
+      "resource:default/wealthwise-postgresql",
+      "api:default/wealthwise-api"
+    ],
+    "alice_access": "VERIFIED",
+    "location": "https://bitbucket.org/relessaw_demo/wealthwise-demo-catalog/src/main/catalog-info.yaml",
+    "portal": "https://wnzl-developer-hub.apps.cluster-gwmg9.dyn.redhatworkshops.io/catalog/default/component/wealthwise"
+  },
+  "java_tests": {
+    "passed": 13,
+    "failures": 0,
+    "errors": 0
+  },
+  "source_transfer_test": "PASSED",
+  "identity_repeat": {
+    "ok": 13,
+    "changed": 0,
+    "failed": 0
+  },
+  "application_repeat": {
+    "ok": 14,
+    "changed": 0,
+    "failed": 0
+  },
+  "portal_compatibility_repeat": {
+    "ok": 5,
+    "changed": 0,
+    "failed": 0
+  },
+  "catalog_repeat": {
+    "ok": 7,
+    "changed": 0,
+    "failed": 0
+  },
+  "browser_journey": "PENDING_USER_SIGN_IN",
+  "original_source": "UNCHANGED",
+  "framework_pr": "https://github.com/relessawy/Demo-Library/pull/73",
+  "framework_merge": "12face8c45b7b95663603e663738db3969b0e049"
+}

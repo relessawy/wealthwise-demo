@@ -4,13 +4,25 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
 
 @org.eclipse.microprofile.openapi.annotations.security.SecurityScheme(
-    securitySchemeName = "demo",
+    securitySchemeName = "oidc",
     type = org.eclipse.microprofile.openapi.annotations.enums.SecuritySchemeType.HTTP,
-    scheme = "basic")
-@org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement(name = "demo")
+    scheme = "bearer", bearerFormat = "JWT")
+@org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement(name = "oidc")
 @Path("/api")
 @Produces(MediaType.APPLICATION_JSON)
 public class ApiResource {
+  @jakarta.inject.Inject org.eclipse.microprofile.jwt.JsonWebToken token;
+
+  private String owner() {
+    return HistoryIdentity.key(token.getIssuer(), token.getSubject());
+  }
+
+  @GET
+  @Path("/me")
+  public java.util.Map<String,String> me() {
+    return java.util.Map.of("username", token.getClaim("preferred_username"), "identity", owner());
+  }
+
   @GET
   @Path("/session")
   public Response session() {
@@ -25,7 +37,7 @@ public class ApiResource {
         Remote.env("FINANCIAL_URL", "http://financial-advisor:8080") + "/chat",
         "POST",
         body,
-        ctx.getUserPrincipal().getName());
+        owner());
   }
 
   @POST
@@ -36,7 +48,7 @@ public class ApiResource {
         Remote.env("INVESTMENT_URL", "http://investment-advisor:8080") + "/chat",
         "POST",
         body,
-        ctx.getUserPrincipal().getName());
+        owner());
   }
 
   @GET
@@ -54,6 +66,6 @@ public class ApiResource {
             + offset,
         "GET",
         null,
-        ctx.getUserPrincipal().getName());
+        owner());
   }
 }

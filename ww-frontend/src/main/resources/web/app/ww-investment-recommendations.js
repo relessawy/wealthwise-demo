@@ -110,6 +110,7 @@ class WwInvestmentRecommendations extends LitElement {
 
             this.ajax.open("POST", "/api/investment/chat", true);
             this.ajax.setRequestHeader("Content-Type", "application/json");
+        this.ajax.setRequestHeader("X-Requested-With", "XMLHttpRequest");
             this.ajax.send(JSON.stringify(data));
         }
     }

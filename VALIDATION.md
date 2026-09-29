@@ -1,33 +1,34 @@
-# WealthWise baseline validation — 29 September 2026
+# WealthWise identity/catalog milestone — 29 September 2026
 
-Status: **automated baseline verified; authenticated browser journey pending user sign-in**. This is a review candidate, not acceptance of the later portal/GitOps/mesh milestones.
+Status: **automated identity and catalog acceptance verified; interactive browser walkthrough pending user sign-in**. Baseline PR #1 was merged at the user's request; its feature branch was deleted. This milestone is a separate change and does not claim delivery of the later template/CI/mesh stages.
 
 | Check | Observed result |
 |---|---|
-| Original repository and tracked source | Commit and every recorded file SHA-256 unchanged |
-| Four-module build in OpenShift | Maven verify passed; 10 Java tests, zero failures/errors |
-| Source transfer boundary | Python test passed: ignored credentials, private files and external symlinks excluded |
-| Container delivery | Four images built in the isolated namespace; immutable digests passed to Helm; base image pinned by digest |
-| Ansible deployment | PostgreSQL role/chart reused; application chart deployed successfully |
-| Public API acceptance | 18 checks passed (including form session and OpenAPI): missing/bad auth, deterministic answers, all risk choices, duplicate/conflicting requests, malformed input, pagination and identity override |
-| Form authentication | Login succeeds; session grants API access; cookie Secure, HttpOnly, SameSite=Strict |
-| Network isolation | Unlabelled tools pod timed out against both advisors, history and PostgreSQL; authenticated application flow succeeds |
-| Unchanged Ansible reconciliation | Passed with 14 ok, 0 changed, 0 failed; generated credentials were retained |
-| Persistence | Recorded history remained after PostgreSQL StatefulSet and history Deployment restarts |
-| UI | Application and login form render in the browser; signed-in question/risk/history navigation awaits browser sign-in |
+| Original WealthWise repository | Original commit and all recorded tracked SHA-256 values unchanged |
+| Cluster Maven verification | 13 Java tests passed, no failures/errors; issuer/subject isolation tests included |
+| Source-transfer boundary | Python test passes: private/ignored files and external symlinks excluded |
+| Keycloak client | Separate confidential client; exact callback/logout target; PKCE S256; implicit/password/service-account flows disabled |
+| OIDC/API acceptance in runner | 23 checks passed; Alice/Bob code flows, distinct subjects, separate history, anonymous/forged token rejection, retries/conflicts, input checks, cookie protections and logout |
+| API contract | Actual deployed OpenAPI registered as a provided API; bearer security documented |
+| Catalog | Seven entities accepted: System, four Components, PostgreSQL Resource and API; Alice can read application/API |
+| Repeated identity reconciliation | 13 ok, 0 changed, 0 failed |
+| Repeated application reconciliation | 14 ok, 0 changed, 0 failed; images/credentials retained |
+| Repeated portal compatibility migration | 5 ok, 0 changed, 0 failed; no second rollout |
+| Catalog publication | 7 ok, 0 changed, 0 failed; multipart line endings normalized to avoid redundant commits |
+| Browser | Keycloak redirect and PKCE observed; interactive signed-in UI walkthrough awaits user sign-in |
 
-The final source uses Java 21, Quarkus 3.27.3, web-bundler 2.2.1 and PostgreSQL 16. Version compatibility was exercised by these builds and runtime checks; no comprehensive vulnerability scan or Red Hat support certification is claimed.
+The final frontend excludes OIDC/logout routes from SPA routing and marks its XHRs appropriately so expired sessions receive an authentication failure rather than an HTML redirect. Final runtime changes were built in the cluster; the last targeted rebuild replaced only the frontend and retained the already-qualified backend digests. Default provisioning still builds all modules.
 
-The old UI bundler failed against the newer Quarkus API and was upgraded. Invalid embedded Secret resources and stale scaffold tests were replaced. UI history registration, routing, error states and responsive header were corrected. A Qute inline-CSS build failure was fixed before deployment. These failures are not accepted as passing tests.
+A portal allowlist omission initially rejected the database Resource and therefore the catalog package. Demo-Library PR #73 corrects the shared template; an owned-release compatibility playbook preserves deployed Helm values and adds the missing kind. Catalog publication initially committed unchanged data because MIME transport converted LF to CRLF; comparison now normalizes line endings. These failures were fixed before the recorded successful acceptance.
 
-The browser automation tool blocks Terminal access used for private credential transfer; the user has been asked to sign in through the ordinary form. No workstation controls were disabled. The authenticated browser journey remains explicitly pending.
+The prior baseline's negative network probes and database/history restart persistence remain historical evidence; they were not re-run or presented as fresh tests in this milestone. Identity and the application were repeat-reconciled, but an entire environment stop/start is not claimed.
 
-## Not delivered in this baseline
+## Pending later milestones
 
-- WealthWise Keycloak/Alice/Bob integration and application persona acceptance.
-- Portal template, API/TechDocs/workspace/catalog onboarding for WealthWise.
-- Jenkins/SonarQube artifact publication for the four modules.
-- SBOM, attestation, GitOps deployment/promotion, mesh traffic/security exercises.
-- Live AI provider integration, event-driven history, HA, backup or restore.
+- Interactive Alice/Bob browser exercise and portal API rendering walkthrough.
+- WealthWise software-template repository creation, TechDocs and Dev Spaces profile.
+- Jenkins/SonarQube publication for all four modules.
+- Images, SBOM/attestation, GitOps promotion and Service Mesh exercises.
+- Optional live AI integration. No HA, backup/restore or vendor support certification claim.
 
-These are separate milestones, not implied by the working qualification application.
+`docs/identity-catalog-qualification.json` contains sanitized automated evidence. Secrets and tokens remain outside Git.

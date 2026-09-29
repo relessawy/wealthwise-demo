@@ -1,0 +1,39 @@
+- name: Enable database catalog entities in an existing owned portal
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+  - name: Read deployed Helm values
+    kubernetes.core.helm_info:
+      name: '{{ portal_name }}'
+      release_namespace: '{{ portal_namespace }}'
+    register: current
+    no_log: true
+  - name: Require owned supported portal release
+    ansible.builtin.assert:
+      that:
+      - current.status.chart == 'redhat-developer-hub-1.10.4'
+      - current.status['values'].upstream.commonLabels['demo-library.io/owner'] == 'developer-hub-foundation'
+    no_log: true
+  - name: Extend catalog kinds without replacing existing configuration
+    ansible.builtin.set_fact:
+      catalog_rules: '{{ current.status["values"].upstream.backstage.appConfig.catalog.rules + [{"allow":["Resource"]}] }}'
+    no_log: true
+  - name: Verify chart provenance
+    ansible.builtin.stat:
+      path: /tmp/portal-catalog/chart.tgz
+      checksum_algorithm: sha256
+    register: chart
+  - name: Require qualified chart checksum
+    ansible.builtin.assert:
+      that: chart.stat.checksum == 'de135c957a00ac0a87ef1bf1acc7a57f6f29004bb915262e08f2c0df9a3e8e57'
+  - name: Reconcile portal with Resource enabled
+    kubernetes.core.helm:
+      name: '{{ portal_name }}'
+      release_namespace: '{{ portal_namespace }}'
+      chart_ref: /tmp/portal-catalog/chart.tgz
+      release_values: '{{ current.status["values"] | combine({"upstream":{"backstage":{"appConfig":{"catalog":{"rules":catalog_rules}}}}},recursive=true) }}'
+      wait: true
+      timeout: 8m
+    when: "'Resource' not in (current.status['values'].upstream.backstage.appConfig.catalog.rules | map(attribute='allow') | flatten)"
+    no_log: true

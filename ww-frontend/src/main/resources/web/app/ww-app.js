@@ -57,15 +57,19 @@ class WwApp extends LitElement {
     `;
 
     static properties = {
-        currentPath: { type: String }
+        currentPath: { type: String },
+        user: { state: true }
     };
 
     constructor() {
         super();
         this.currentPath = window.location.pathname;
+        this.user = null;
     }
 
     firstUpdated() {
+        fetch('/api/me', {headers: {'X-Requested-With':'XMLHttpRequest'}})
+            .then(r => r.ok ? r.json() : null).then(u => { this.user = u; }).catch(() => {});
         const router = new Router(this.shadowRoot.querySelector('.content'));
 
         router.setRoutes([
@@ -90,7 +94,7 @@ class WwApp extends LitElement {
 
     render() {
         return html`
-            <p>ACME Bank · Scripted demonstration, not live AI. <a href="/login.html" router-ignore>Sign in</a></p><div class="center">
+            <p>ACME Bank · Scripted demonstration, not live AI. ${this.user ? html`Signed in as ${this.user.username}. <a href="/logout" router-ignore>Sign out</a>` : html`<a href="/api/session" router-ignore>Sign in with your bank account</a>`}</p><div class="center">
                 <ww-header></ww-header>
                 <nav>
                     <a href="/"

@@ -148,6 +148,7 @@ class WwFinancialAdvisor extends LitElement {
         var data = { "message": this._question, "requestId": crypto.randomUUID() };
         this.ajax.open("POST", "/api/financial/chat", true);
         this.ajax.setRequestHeader("Content-Type", "application/json");
+        this.ajax.setRequestHeader("X-Requested-With", "XMLHttpRequest");
         this.ajax.send(JSON.stringify(data));
         this._question = '';
     }

@@ -1,0 +1,74 @@
+- name: Publish the WealthWise catalog package into the configured private demo workspace
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    repo_name: wealthwise-demo-catalog
+    owner_marker: 'Demo-Library generated WealthWise catalog; maintained from wealthwise-demo'
+  tasks:
+  - name: Define repository API and authorization
+    ansible.builtin.set_fact:
+      repository_api: 'https://api.bitbucket.org/2.0/repositories/{{ workspace }}/{{ repo_name }}'
+      bb_headers: {Authorization: 'Basic {{ (email + ":" + api_token) | b64encode }}'}
+    no_log: true
+  - name: Read the configured seed project
+    ansible.builtin.uri:
+      url: 'https://api.bitbucket.org/2.0/repositories/{{ workspace }}/{{ seed_repository }}'
+      headers: '{{ bb_headers }}'
+    register: seed
+    no_log: true
+  - name: Inspect generated catalog repository
+    ansible.builtin.uri:
+      url: '{{ repository_api }}'
+      headers: '{{ bb_headers }}'
+      status_code: [200,404]
+    register: repository
+    no_log: true
+  - name: Refuse foreign or public repository
+    ansible.builtin.assert:
+      that: repository.status == 404 or (repository.json.description == owner_marker and repository.json.is_private)
+  - name: Create generated private catalog repository
+    ansible.builtin.uri:
+      url: '{{ repository_api }}'
+      headers: '{{ bb_headers }}'
+      method: POST
+      body_format: json
+      body: {scm: git, is_private: true, description: '{{ owner_marker }}', project: {key: '{{ seed.json.project.key }}'}}
+      status_code: 200
+    when: repository.status == 404
+    changed_when: true
+    no_log: true
+  - name: Read actual application API contract
+    ansible.builtin.uri:
+      url: '{{ application_url }}/q/openapi?format=json'
+    register: openapi
+  - name: Generate catalog from the versioned template
+    ansible.builtin.set_fact:
+      rendered_catalog: '{{ lookup("template", playbook_dir + "/../catalog/catalog.yaml.j2") }}'
+  - name: Inspect existing catalog content
+    ansible.builtin.uri:
+      url: '{{ repository_api }}/src/main/catalog-info.yaml'
+      headers: '{{ bb_headers }}'
+      return_content: true
+      status_code: [200,404]
+    register: existing_catalog
+    no_log: true
+  - name: Publish changed catalog content
+    ansible.builtin.uri:
+      url: '{{ repository_api }}/src'
+      method: POST
+      headers: '{{ bb_headers }}'
+      body_format: form-multipart
+      body:
+        branch: main
+        message: Reconcile verified WealthWise catalog and API contract
+        catalog-info.yaml:
+          content: '{{ rendered_catalog }}'
+          mime_type: text/plain
+        README.md:
+          content: 'Generated catalog package. Application source and consultant instructions: https://github.com/relessawy/wealthwise-demo. Do not maintain a second implementation here.'
+          mime_type: text/plain
+      status_code: 201
+    when: existing_catalog.status == 404 or existing_catalog.content.strip().splitlines() != rendered_catalog.strip().splitlines()
+    changed_when: true
+    no_log: true
