@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.resourceName }}
+  labels:
+    demo-library.io/owner: {{ .Values.owner }}
+    app.kubernetes.io/part-of: {{ .Values.partOf }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  serviceName: {{ .Values.resourceName }}
+  selector:
+    matchLabels:
+      app: {{ .Values.resourceName }}
+  template:
+    metadata:
+      labels:
+        demo-library.io/owner: {{ .Values.owner }}
+        app.kubernetes.io/part-of: {{ .Values.partOf }}
+        app: {{ .Values.resourceName }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: postgres
+        image: {{ .Values.image }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: '2'
+            memory: 2Gi
+        env:
+        - name: POSTGRESQL_USER
+          value: {{ .Values.databaseUser }}
+        - name: POSTGRESQL_DATABASE
+          value: {{ .Values.databaseName }}
+        - name: POSTGRESQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.resourceName }}-app
+              key: password
+        ports:
+        - containerPort: 5432
+          name: postgres
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/pgsql/data
+        - name: cfg
+          mountPath: /opt/app-root/src/postgresql-cfg/postgresql.conf
+          subPath: postgresql.conf
+          readOnly: true
+        - name: cfg
+          mountPath: /opt/app-root/src/security
+          readOnly: true
+        - name: tls
+          mountPath: /tls
+          readOnly: true
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -h /var/run/postgresql -p 5432
+          periodSeconds: 10
+        startupProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -h /var/run/postgresql -p 5432
+          periodSeconds: 5
+          failureThreshold: 60
+      volumes:
+      - name: cfg
+        configMap:
+          name: {{ .Values.resourceName }}-config
+      - name: tls
+        secret:
+          secretName: {{ .Values.resourceName }}-tls
+          defaultMode: 416
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      labels:
+        demo-library.io/owner: {{ .Values.owner }}
+        app.kubernetes.io/part-of: {{ .Values.partOf }}
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: {{ required "Set storageClass to an available RWO provisioner" .Values.storageClass }}
+      resources:
+        requests:
+          storage: {{ .Values.storageSize }}

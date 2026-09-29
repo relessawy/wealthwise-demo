@@ -3,3 +3,8 @@
 .private/
 *.local.*
 .DS_Store
+**/node_modules/
+**/.quarkus/
+**/.quarkus-web-bundler/
+**/__pycache__/
+*.pyc

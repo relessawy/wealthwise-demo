@@ -1,0 +1,93 @@
+- name: Read acceptance namespace
+  kubernetes.core.k8s_info:
+    kind: Namespace
+    name: '{{ client_namespace }}'
+  register: client_ns
+- name: Require separate owned acceptance boundary
+  ansible.builtin.assert:
+    that:
+    - client_namespace != workload_namespace
+    - client_ns.resources | length == 0 or client_ns.resources[0].metadata.labels.get('demo-library.io/owner','')
+      == owner
+    - manage_namespaces | default(true) | bool or client_ns.resources | length == 1
+- name: Create temporary acceptance boundary
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: '{{ client_namespace }}'
+        labels:
+          demo-library.io/owner: '{{ owner }}'
+  when: client_ns.resources | length == 0 and manage_namespaces | default(true) | bool
+- name: Prepare scoped verification credentials
+  ansible.builtin.include_tasks: client-secret.yml
+  loop:
+  - app
+  - ca
+  loop_control:
+    loop_var: suffix
+- name: Run positive negative and optional persistence checks
+  ansible.builtin.shell:
+    cmd: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      : "${KUBECONFIG:?}" "${DB_NAMESPACE:?}" "${CLIENT_NAMESPACE:?}" "${VERIFY_CHART:?}"
+      helm template postgres-check "$VERIFY_CHART" -n "$DB_NAMESPACE" --set-string databaseNamespace="$DB_NAMESPACE" --set-string clientNamespace="$CLIENT_NAMESPACE" --set-string resourceName="{{ postgres_name }}" --set-string owner="{{ owner }}" --set-string partOf="{{ part_of }}" --set-string clientLabel="{{ postgres_client_label }}" --set-string databaseUser="{{ postgres_user }}" --set-string databaseName="{{ postgres_database }}" > /tmp/postgres-check-rendered.yaml
+      helm upgrade --install postgres-check "$VERIFY_CHART" -n "$DB_NAMESPACE" --set-string databaseNamespace="$DB_NAMESPACE" --set-string clientNamespace="$CLIENT_NAMESPACE" --set-string resourceName="{{ postgres_name }}" --set-string owner="{{ owner }}" --set-string partOf="{{ part_of }}" --set-string clientLabel="{{ postgres_client_label }}" --set-string databaseUser="{{ postgres_user }}" --set-string databaseName="{{ postgres_database }}" --wait --timeout 3m
+      result=$(oc -n "$DB_NAMESPACE" exec verify-db -- psql -X -At -c "SELECT current_user,current_database(),(SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()); SELECT rolsuper,rolcreatedb,rolcreaterole,rolreplication FROM pg_roles WHERE rolname=current_user;")
+      test "$result" = $'{{ postgres_user }}|{{ postgres_database }}|t\nf|f|f|f'
+      echo 'TLS_IDENTITY_ROLE PASS'
+      if result=$(oc -n "$DB_NAMESPACE" exec verify-db -- env PGSSLMODE=disable psql -X -At -c 'SELECT 1' 2>&1); then echo 'Unexpected non-TLS access'; exit 1; fi
+      printf '%s' "$result" | grep -Eq 'reject|pg_hba'
+      echo 'NON_TLS_REJECTION PASS'
+      if result=$(oc -n "$DB_NAMESPACE" exec verify-db -- psql -X -v ON_ERROR_STOP=1 -c 'CREATE DATABASE forbidden_qualification' 2>&1); then echo 'Unexpected privilege'; exit 1; fi
+      printf '%s' "$result" | grep -q 'permission denied'
+      echo 'CREATE_DATABASE_DENIED PASS'
+      if result=$(oc -n "$DB_NAMESPACE" exec verify-db -- env PGPASSWORD=incorrect-qualification-password psql -X -At -c 'SELECT 1' 2>&1); then echo 'Unexpected authentication'; exit 1; fi
+      printf '%s' "$result" | grep -q 'password authentication failed'
+      echo 'WRONG_PASSWORD_DENIED PASS'
+      test "$(oc -n "$CLIENT_NAMESPACE" exec verify-cross -- psql -X -At -c 'SELECT 1')" = 1
+      echo 'CROSS_NAMESPACE_ALLOWED PASS'
+      if result=$(oc -n "$CLIENT_NAMESPACE" exec verify-denied -- psql -X -At -c 'SELECT 1' 2>&1); then echo 'Unexpected network access'; exit 1; fi
+      printf '%s' "$result" | grep -Eq 'timeout|timed out'
+      echo 'UNLABELLED_CLIENT_DENIED PASS'
+      if [ "$RESTART_CHECK" = true ]; then
+      PROOF=$(openssl rand -hex 16)
+      oc -n "$DB_NAMESPACE" exec verify-db -- psql -X -v ON_ERROR_STOP=1 -c "CREATE TABLE IF NOT EXISTS qualification_proof(id text PRIMARY KEY); INSERT INTO qualification_proof VALUES ('$PROOF');"
+      POD={{ postgres_name }}-0
+      PVC=data-{{ postgres_name }}-0
+      POD_UID=$(oc -n "$DB_NAMESPACE" get pod "$POD" -o jsonpath='{.metadata.uid}')
+      PVC_UID=$(oc -n "$DB_NAMESPACE" get pvc "$PVC" -o jsonpath='{.metadata.uid}')
+      VOLUME=$(oc -n "$DB_NAMESPACE" get pvc "$PVC" -o jsonpath='{.spec.volumeName}')
+      STS_UID=$(oc -n "$DB_NAMESPACE" get statefulset {{ postgres_name }} -o jsonpath='{.metadata.uid}')
+      test "$(oc -n "$DB_NAMESPACE" get pod "$POD" -o jsonpath='{.metadata.ownerReferences[0].uid}')" = "$STS_UID"
+      printf '{"apiVersion":"v1","kind":"DeleteOptions","preconditions":{"uid":"%s"}}' "$POD_UID" | oc delete --raw "/api/v1/namespaces/$DB_NAMESPACE/pods/$POD" -f - >/dev/null
+      for attempt in $(seq 1 60); do
+        NEW_UID=$(oc -n "$DB_NAMESPACE" get pod "$POD" --ignore-not-found -o jsonpath='{.metadata.uid}')
+        if [ -n "$NEW_UID" ] && [ "$NEW_UID" != "$POD_UID" ]; then break; fi
+        sleep 3
+      done
+      test -n "$NEW_UID" && test "$NEW_UID" != "$POD_UID"
+      oc -n "$DB_NAMESPACE" wait --for=condition=Ready "pod/$POD" --timeout=180s
+      test "$(oc -n "$DB_NAMESPACE" get pvc "$PVC" -o jsonpath='{.metadata.uid}')" = "$PVC_UID"
+      test "$(oc -n "$DB_NAMESPACE" get pvc "$PVC" -o jsonpath='{.spec.volumeName}')" = "$VOLUME"
+      test "$(oc -n "$DB_NAMESPACE" exec verify-db -- psql -X -At -c "SELECT id FROM qualification_proof WHERE id='$PROOF'")" = "$PROOF"
+      oc -n "$DB_NAMESPACE" exec verify-db -- psql -X -v ON_ERROR_STOP=1 -c "DELETE FROM qualification_proof WHERE id='$PROOF'"
+      echo 'RESTART_PERSISTENCE_SAME_PVC PASS'
+      fi
+
+      oc -n "$DB_NAMESPACE" exec verify-db -- psql -X -At -c 'SHOW server_version'
+      helm uninstall postgres-check -n "$DB_NAMESPACE"
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: '{{ kubeconfig }}'
+    DB_NAMESPACE: '{{ workload_namespace }}'
+    CLIENT_NAMESPACE: '{{ client_namespace }}'
+    VERIFY_CHART: '{{ asset_root }}/verification'
+    RESTART_CHECK: '{{ restart_check | bool | ternary("true","false") }}'
+  register: pg_acceptance
+  changed_when: false
+- name: Show SQL acceptance markers
+  ansible.builtin.debug:
+    var: pg_acceptance.stdout_lines

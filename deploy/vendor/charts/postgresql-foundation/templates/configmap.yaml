@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.resourceName }}-config
+  labels:
+    demo-library.io/owner: {{ .Values.owner }}
+    app.kubernetes.io/part-of: {{ .Values.partOf }}
+  namespace: {{ .Release.Namespace }}
+data:
+  postgresql.conf: 'ssl=on
+
+    ssl_cert_file=''/tls/tls.crt''
+
+    ssl_key_file=''/tls/tls.key''
+
+    password_encryption=''scram-sha-256''
+
+    hba_file=''/opt/app-root/src/security/pg_hba.conf''
+
+    '
+  pg_hba.conf: 'local all all trust
+
+    hostnossl all all all reject
+
+    hostssl {{ .Values.databaseName }} {{ .Values.databaseUser }} all scram-sha-256
+
+    host all all all reject
+
+    '

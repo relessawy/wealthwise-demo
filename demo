@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")"
+case "${1:-all}" in
+  all|apply) python3 -m unittest discover -s tests; python3 scripts/provision.py; python3 scripts/acceptance.py ;;
+  verify) python3 scripts/acceptance.py ;;
+  build) bash scripts/build.sh ;;
+  *) printf '%s\n' 'Usage: bash demo [all|apply|verify|build]'; exit 2 ;;
+esac

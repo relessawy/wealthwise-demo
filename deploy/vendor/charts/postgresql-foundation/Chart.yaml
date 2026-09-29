@@ -1,0 +1,6 @@
+apiVersion: v2
+name: postgresql-foundation
+description: Single-instance Red Hat PostgreSQL with TLS and restricted network access
+type: application
+version: 0.2.0
+appVersion: "16.15"

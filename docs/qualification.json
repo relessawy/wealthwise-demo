@@ -1,0 +1,41 @@
+{
+  "status": "AUTOMATED_BASELINE_VERIFIED_BROWSER_PENDING",
+  "date": "2026-09-29",
+  "java_tests": 10,
+  "transport_tests": 1,
+  "api_checks": [
+    "anonymous history rejected",
+    "incorrect credential rejected",
+    "financial response explicitly scripted",
+    "retry succeeds",
+    "conflicting retry rejected",
+    "one persisted row after retry",
+    "investment Conservative",
+    "investment Balanced",
+    "investment Aggressive",
+    "invalid investment rejected",
+    "empty financial question rejected",
+    "invalid history page rejected",
+    "missing request identity rejected",
+    "client cannot override history identity"
+  ],
+  "form_auth": [
+    "form sign-in",
+    "cookie-authenticated API",
+    "Secure HttpOnly SameSite=Strict cookie"
+  ],
+  "network_denied": [
+    "financial-advisor:8080",
+    "investment-advisor:8080",
+    "advisor-history:8080",
+    "wealthwise-db:5432"
+  ],
+  "persistence": "Verified after database and history workload restart",
+  "browser": "Login form and unauthenticated UI observed; authenticated journey pending",
+  "original_source_unchanged": true,
+  "repeat_apply": {
+    "ok": 14,
+    "changed": 0,
+    "failed": 0
+  }
+}
