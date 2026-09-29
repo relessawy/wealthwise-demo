@@ -116,3 +116,21 @@ Database/history pod restart persistence was accepted in the baseline; repeat pr
 Next milestones: create a versioned WealthWise software template and repository delivery; publish TechDocs and a persistent development profile; extend Jenkins/SonarQube to all modules; build images/SBOM/attestation; GitOps promotion and mesh exercises. A live AI provider remains optional and explicitly separate.
 
 OIDC design reference: https://quarkus.io/guides/security-oidc-code-flow-authentication/
+
+## Optional Splunk application observability
+
+The observability-enabled source adds six allowlisted API request-completion fields and an authenticated, opt-in operational check. Normal deployments keep recording and the check disabled. The shared Splunk integration supplies an owned collector ConfigMap/Secret and enables both through Helm without changing deployed image digests.
+
+Before installing the optional integration, publish its catalog/template prerequisite explicitly:
+
+```bash
+WEALTHWISE_SPLUNK_CATALOG=true bash demo onboard
+```
+
+Then run the Splunk stage from the consultant delivery as documented in its handover. Subsequent application provisioning reads the owned integration ConfigMap and preserves the collector. Subsequent catalog publication detects the integration automatically.
+
+The template **Onboard WealthWise application logs** checks whether the existing component is registered and returns its Splunk tab and application links. It does not create a second repository or application. The controlled error link returns one synthetic HTTP 500; the healthy link returns 200. Both require the normal application identity session. No customer state is changed.
+
+Request records omit bodies, query strings, usernames, cookies and tokens. They contain event type, service, environment, status, request ID and timestamp. A 5 MiB buffer on an ephemeral volume bounds growth; a full buffer stops recording without blocking application requests. Buffered events can be lost when the application pod is deleted. Collector retries are deduplicated by request ID in the portal query. This is a demo adapter, not durable production logging.
+
+Additional collector requests are 10m CPU/32Mi, limits 100m/96Mi, and 16Mi ephemeral space. Splunk/operator capacity and their persistent claims belong to the shared integration handover. No new application database is required.

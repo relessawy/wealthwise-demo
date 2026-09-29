@@ -62,6 +62,15 @@
     ansible.builtin.assert:
       that: oidc.resources | length == 1 and oidc.resources[0].metadata.labels.get('demo-library.io/owner','') == owner
     no_log: true
+  - name: Read optional Splunk integration configuration
+    kubernetes.core.k8s_info:
+      kind: ConfigMap
+      name: wealthwise-splunk-collector
+      namespace: '{{ workload_namespace }}'
+    register: splunk_config
+  - name: Validate optional integration ownership
+    ansible.builtin.assert:
+      that: splunk_config.resources | length == 0 or splunk_config.resources[0].metadata.labels.get('demo-library.io/owner','') == owner
   - name: Deploy application
     kubernetes.core.helm:
       name: wealthwise
@@ -70,5 +79,6 @@
       release_values:
         owner: '{{ owner }}'
         images: '{{ images }}'
+        observability: '{{ (splunk_config.resources[0].data["values.json"] | from_json) if splunk_config.resources | length else {"enabled":false} }}'
       wait: true
       timeout: 8m

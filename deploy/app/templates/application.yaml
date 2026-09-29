@@ -32,6 +32,12 @@ spec:
         livenessProbe: {httpGet: {path: /q/health/live, port: http}, periodSeconds: 20}
         env:
         - {name: JAVA_OPTS_APPEND, value: '-XX:MaxRAMPercentage=70.0'}
+        {{- if and (eq $name "ww-frontend") $.Values.observability.enabled }}
+        - {name: WEALTHWISE_REQUEST_EVENTS_FILE, value: /events/requests.ndjson}
+        - {name: WEALTHWISE_REQUEST_EVENTS_SERVICE, value: {{ $.Values.observability.service | quote }}}
+        - {name: WEALTHWISE_REQUEST_EVENTS_ENVIRONMENT, value: {{ $.Values.observability.environment | quote }}}
+        - {name: WEALTHWISE_DEMO_OPERATIONAL_CHECK, value: 'true'}
+        {{- end }}
         {{- if eq $name "ww-frontend" }}
         - name: OIDC_ISSUER
           valueFrom: {secretKeyRef: {name: wealthwise-oidc, key: issuer}}
@@ -39,6 +45,25 @@ spec:
           valueFrom: {secretKeyRef: {name: wealthwise-oidc, key: client-id}}
         - name: OIDC_CLIENT_SECRET
           valueFrom: {secretKeyRef: {name: wealthwise-oidc, key: client-secret}}
+        {{- end }}
+        {{- if and (eq $name "ww-frontend") $.Values.observability.enabled }}
+        volumeMounts: [{name: request-events, mountPath: /events}]
+      - name: splunk-collector
+        image: {{ $.Values.observability.collectorImage | quote }}
+        command: [python3, /collector/forward.py]
+        env: [{name: HEC_URL, value: {{ $.Values.observability.hecUrl | quote }}}]
+        securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, readOnlyRootFilesystem: true}
+        resources:
+          requests: {cpu: 10m, memory: 32Mi}
+          limits: {cpu: 100m, memory: 96Mi}
+        volumeMounts:
+        - {name: request-events, mountPath: /events}
+        - {name: collector-script, mountPath: /collector, readOnly: true}
+        - {name: splunk-access, mountPath: /splunk-access, readOnly: true}
+      volumes:
+      - {name: request-events, emptyDir: {sizeLimit: 16Mi}}
+      - {name: collector-script, configMap: {name: wealthwise-splunk-collector}}
+      - {name: splunk-access, secret: {secretName: wealthwise-splunk-access}}
         {{- end }}
         {{- if eq $name "advisor-history" }}
         - {name: DB_USER, value: wealthwise}

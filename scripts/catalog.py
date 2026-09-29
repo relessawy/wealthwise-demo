@@ -9,9 +9,14 @@ def main():
     s=get('secret',pname+'-bitbucket',pns)
     assert s['metadata'].get('labels',{}).get('demo-library.io/owner')=='developer-hub-foundation','Unrecognized integration ownership'
     d={k:base64.b64decode(v).decode() for k,v in s['data'].items()}
-    values={'source_ref':'v'+(ROOT/'VERSION').read_text().strip(),'workspace':d['workspace'],'email':d['email'],'api_token':d['api-token'],
+    values={'splunk_enabled':os.environ.get('WEALTHWISE_SPLUNK_CATALOG','false').lower()=='true','source_ref':'v'+(ROOT/'VERSION').read_text().strip(),'workspace':d['workspace'],'email':d['email'],'api_token':d['api-token'],
         'seed_repository':d['template-url'].split('/')[4],
         'application_url':'https://'+get('route','wealthwise',NS)['spec']['host']}
+    integration=subprocess.run([OC,'get','configmap','wealthwise-splunk-collector','-n',NS,'--ignore-not-found','-o','json'],capture_output=True,text=True,check=True)
+    if integration.stdout.strip():
+        config=json.loads(integration.stdout)
+        assert config['metadata'].get('labels',{}).get('demo-library.io/owner')=='wealthwise-demo'
+        values['splunk_enabled']=True
     remote='/work/catalog-onboarding'
     subprocess.run([OC,'exec','-n',NS,'wealthwise-tools','-c','runner','--','mkdir','-p',remote],check=True)
     with tempfile.TemporaryDirectory() as t:
