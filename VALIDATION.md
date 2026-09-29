@@ -9,7 +9,7 @@ Status: **automated baseline verified; authenticated browser journey pending use
 | Source transfer boundary | Python test passed: ignored credentials, private files and external symlinks excluded |
 | Container delivery | Four images built in the isolated namespace; immutable digests passed to Helm; base image pinned by digest |
 | Ansible deployment | PostgreSQL role/chart reused; application chart deployed successfully |
-| Public API acceptance | 14 checks passed: missing/bad auth, deterministic answers, all risk choices, duplicate/conflicting requests, malformed input, pagination and identity override |
+| Public API acceptance | 18 checks passed (including form session and OpenAPI): missing/bad auth, deterministic answers, all risk choices, duplicate/conflicting requests, malformed input, pagination and identity override |
 | Form authentication | Login succeeds; session grants API access; cookie Secure, HttpOnly, SameSite=Strict |
 | Network isolation | Unlabelled tools pod timed out against both advisors, history and PostgreSQL; authenticated application flow succeeds |
 | Unchanged Ansible reconciliation | Passed with 14 ok, 0 changed, 0 failed; generated credentials were retained |

@@ -17,7 +17,11 @@
     "empty financial question rejected",
     "invalid history page rejected",
     "missing request identity rejected",
-    "client cannot override history identity"
+    "client cannot override history identity",
+    "form sign-in succeeds",
+    "form session authorizes API",
+    "form cookie protections",
+    "OpenAPI documents protected application endpoints"
   ],
   "form_auth": [
     "form sign-in",
