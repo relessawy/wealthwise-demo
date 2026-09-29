@@ -1,0 +1,6 @@
+postgres_name: postgresql
+postgres_release: postgresql
+postgres_user: application
+postgres_database: application
+postgres_client_label: platform.example/db-client
+part_of: platform-foundations

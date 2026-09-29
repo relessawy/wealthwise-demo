@@ -1,0 +1,111 @@
+- name: Generate application credential only on first installation
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: '{{ postgres_name }}-app'
+        namespace: '{{ workload_namespace }}'
+        labels:
+          demo-library.io/owner: '{{ owner }}'
+      type: Opaque
+      stringData:
+        password: '{{ lookup("ansible.builtin.password", "/dev/null", length=40) }}'
+  when: pg_secrets.results[0].resources | length == 0
+  no_log: true
+- name: Create database certificate pair once
+  when: pg_secrets.results[1].resources | length == 0
+  block:
+  - name: Create private certificate workspace
+    ansible.builtin.tempfile:
+      state: directory
+    register: cert_dir
+  - name: Generate the qualified private CA and server certificate
+    ansible.builtin.shell:
+      executable: /bin/bash
+      chdir: '{{ cert_dir.path }}'
+      cmd: |
+        set -euo pipefail
+        umask 077
+        openssl req -x509 -newkey rsa:2048 -nodes -keyout ca.key -out ca.crt -days 365 -subj '/CN=PostgreSQL PoC CA'
+        openssl req -newkey rsa:2048 -nodes -keyout tls.key -out tls.csr -subj "/CN={{ postgres_name }}.$DB_NAMESPACE.svc"
+        printf 'subjectAltName=DNS:{{ postgres_name }}.%s.svc,DNS:{{ postgres_name }}
+        extendedKeyUsage=serverAuth
+        ' "$DB_NAMESPACE" > ext
+        openssl x509 -req -in tls.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out tls.crt -days 90 -extfile ext
+    environment:
+      DB_NAMESPACE: '{{ workload_namespace }}'
+    no_log: true
+  - name: Store server certificate Secret
+    kubernetes.core.k8s:
+      definition:
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: '{{ postgres_name }}-tls'
+          namespace: '{{ workload_namespace }}'
+          labels:
+            demo-library.io/owner: '{{ owner }}'
+        type: Opaque
+        stringData:
+          tls.crt: '{{ lookup("file", cert_dir.path + "/tls.crt") }}'
+          tls.key: '{{ lookup("file", cert_dir.path + "/tls.key") }}'
+    no_log: true
+  - name: Store trusted CA Secret
+    kubernetes.core.k8s:
+      definition:
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: '{{ postgres_name }}-ca'
+          namespace: '{{ workload_namespace }}'
+          labels:
+            demo-library.io/owner: '{{ owner }}'
+        type: Opaque
+        stringData:
+          ca.crt: '{{ lookup("file", cert_dir.path + "/ca.crt") }}'
+    no_log: true
+  always:
+  - name: Remove private key files
+    ansible.builtin.file:
+      path: '{{ cert_dir.path }}'
+      state: absent
+    when: cert_dir.path is defined
+    no_log: true
+- name: Render database chart before reconciliation
+  kubernetes.core.helm_template:
+    chart_ref: '{{ asset_root }}/charts/postgresql-foundation'
+    release_name: '{{ postgres_release }}'
+    release_namespace: '{{ workload_namespace }}'
+    release_values:
+      storageClass: '{{ storage_class }}'
+      verificationNamespace: '{{ client_namespace }}'
+      resourceName: '{{ postgres_name }}'
+      owner: '{{ owner }}'
+      partOf: '{{ part_of }}'
+      clientLabel: '{{ postgres_client_label }}'
+      databaseUser: '{{ postgres_user }}'
+      databaseName: '{{ postgres_database }}'
+  register: pg_render
+  changed_when: false
+- name: Retain rendered database resources for inspection
+  ansible.builtin.copy:
+    dest: '{{ evidence_dir }}/{{ inventory_hostname }}-rendered.yaml'
+    content: '{{ pg_render.stdout }}'
+    mode: '0600'
+- name: Reconcile qualified PostgreSQL Helm release
+  kubernetes.core.helm:
+    name: '{{ postgres_release }}'
+    chart_ref: '{{ asset_root }}/charts/postgresql-foundation'
+    release_namespace: '{{ workload_namespace }}'
+    values:
+      storageClass: '{{ storage_class }}'
+      verificationNamespace: '{{ client_namespace }}'
+      resourceName: '{{ postgres_name }}'
+      owner: '{{ owner }}'
+      partOf: '{{ part_of }}'
+      clientLabel: '{{ postgres_client_label }}'
+      databaseUser: '{{ postgres_user }}'
+      databaseName: '{{ postgres_database }}'
+    wait: true
+    timeout: 8m

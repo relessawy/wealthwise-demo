@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.resourceName }}
+  labels:
+    demo-library.io/owner: {{ .Values.owner }}
+    app.kubernetes.io/part-of: {{ .Values.partOf }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Values.resourceName }}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          {{ .Values.clientLabel }}: 'true'
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ required "Set verificationNamespace" .Values.verificationNamespace }}
+      podSelector:
+        matchLabels:
+          {{ .Values.clientLabel }}: 'true'
+    ports:
+    - protocol: TCP
+      port: 5432

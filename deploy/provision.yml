@@ -1,0 +1,88 @@
+- name: Provision the isolated WealthWise qualification baseline
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    workload_namespace: wealthwise-demo
+    client_namespace: '{{ workload_namespace }}'
+    owner: wealthwise-demo
+    part_of: wealthwise
+    postgres_name: wealthwise-db
+    postgres_release: wealthwise-db
+    postgres_user: wealthwise
+    postgres_database: wealthwise
+    postgres_client_label: wealthwise.example/db-client
+    asset_root: '{{ playbook_dir }}/vendor'
+    evidence_dir: /tmp/wealthwise-evidence
+    operation: apply
+  tasks:
+  - name: Validate required parameters
+    ansible.builtin.assert:
+      that:
+      - workload_namespace is match('^[a-z][a-z0-9-]+$')
+      - storage_class | length > 0
+      - images | length == 4
+      - item is match('^.+@sha256:[a-f0-9]{64}$')
+    loop: '{{ images.values() | list }}'
+  - name: Check namespace ownership
+    when: not (namespace_precreated | default(false) | bool)
+    kubernetes.core.k8s_info:
+      kind: Namespace
+      name: '{{ workload_namespace }}'
+    register: existing
+  - name: Reject unrelated namespace
+    when: not (namespace_precreated | default(false) | bool)
+    ansible.builtin.assert:
+      that: existing.resources | length == 0 or existing.resources[0].metadata.labels.get('demo-library.io/owner','') == owner
+  - name: Create owned namespace
+    when: not (namespace_precreated | default(false) | bool)
+    kubernetes.core.k8s:
+      definition:
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: '{{ workload_namespace }}'
+          labels: {demo-library.io/owner: '{{ owner }}'}
+  - name: Create private evidence directory
+    ansible.builtin.file:
+      path: '{{ evidence_dir }}'
+      state: directory
+      mode: '0700'
+  - name: Reuse shared PostgreSQL role
+    ansible.builtin.include_role:
+      name: postgres
+  - name: Inspect access Secret
+    kubernetes.core.k8s_info:
+      kind: Secret
+      name: wealthwise-access
+      namespace: '{{ workload_namespace }}'
+    register: access
+    no_log: true
+  - name: Check access Secret ownership
+    ansible.builtin.assert:
+      that: access.resources | length == 0 or access.resources[0].metadata.labels.get('demo-library.io/owner','') == owner
+    no_log: true
+  - name: Generate qualification credentials once
+    kubernetes.core.k8s:
+      definition:
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: wealthwise-access
+          namespace: '{{ workload_namespace }}'
+          labels: {demo-library.io/owner: '{{ owner }}'}
+        stringData:
+          username: demo
+          password: '{{ lookup("ansible.builtin.password", "/dev/null", length=32) }}'
+    when: access.resources | length == 0
+    no_log: true
+  - name: Deploy application
+    kubernetes.core.helm:
+      name: wealthwise
+      chart_ref: '{{ playbook_dir }}/app'
+      release_namespace: '{{ workload_namespace }}'
+      release_values:
+        owner: '{{ owner }}'
+        images: '{{ images }}'
+      wait: true
+      timeout: 8m

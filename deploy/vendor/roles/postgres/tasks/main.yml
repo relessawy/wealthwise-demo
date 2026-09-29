@@ -1,0 +1,34 @@
+- name: Validate resource identifiers before use
+  ansible.builtin.assert:
+    that:
+    - postgres_name is match('^[a-z][a-z0-9-]+$')
+    - postgres_user is match('^[a-z][a-z0-9_]+$') and postgres_database is match('^[a-z][a-z0-9_]+$')
+- name: Read database secrets
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: '{{ workload_namespace }}'
+    name: '{{ postgres_name }}-{{ item }}'
+  loop:
+  - app
+  - tls
+  - ca
+  register: pg_secrets
+  no_log: true
+- name: Validate existing credential ownership and certificate completeness
+  ansible.builtin.assert:
+    that:
+    - item.resources | length == 0 or item.resources[0].metadata.labels.get('demo-library.io/owner','')
+      == owner
+  loop: '{{ pg_secrets.results }}'
+  no_log: true
+- name: Reject partial certificate setup
+  ansible.builtin.assert:
+    that:
+    - (pg_secrets.results[1].resources | length) == (pg_secrets.results[2].resources | length)
+  no_log: true
+- name: Apply database foundation
+  ansible.builtin.include_tasks: apply.yml
+  when: operation != 'verify'
+- name: Verify database functionality
+  ansible.builtin.include_tasks: verify.yml
+  when: operation != 'apply'

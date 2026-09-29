@@ -1,0 +1,86 @@
+{{- range $name := list "ww-frontend" "financial-advisor" "investment-advisor" "advisor-history" }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels: {app.kubernetes.io/part-of: wealthwise, demo-library.io/owner: {{ $.Values.owner }}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: {{ $name }}}}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+        app.kubernetes.io/part-of: wealthwise
+        {{- if eq $name "advisor-history" }}
+        wealthwise.example/db-client: 'true'
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+      - name: app
+        image: {{ required (printf "Set immutable image for %s" $name) (index $.Values.images $name) | quote }}
+        securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+        resources:
+          requests: {cpu: 100m, memory: 256Mi}
+          limits: {cpu: '1', memory: 512Mi}
+        ports: [{name: http, containerPort: 8080}]
+        startupProbe: {httpGet: {path: /q/health/started, port: http}, periodSeconds: 5, failureThreshold: 60}
+        readinessProbe: {httpGet: {path: /q/health/ready, port: http}, periodSeconds: 10}
+        livenessProbe: {httpGet: {path: /q/health/live, port: http}, periodSeconds: 20}
+        env:
+        - {name: JAVA_OPTS_APPEND, value: '-XX:MaxRAMPercentage=70.0'}
+        {{- if eq $name "ww-frontend" }}
+        - name: DEMO_USER
+          valueFrom: {secretKeyRef: {name: wealthwise-access, key: username}}
+        - name: DEMO_PASSWORD
+          valueFrom: {secretKeyRef: {name: wealthwise-access, key: password}}
+        {{- end }}
+        {{- if eq $name "advisor-history" }}
+        - {name: DB_USER, value: wealthwise}
+        - {name: DB_URL, value: 'jdbc:postgresql://wealthwise-db:5432/wealthwise?sslmode=verify-full&sslrootcert=/db-ca/ca.crt'}
+        - name: DB_PASSWORD
+          valueFrom: {secretKeyRef: {name: wealthwise-db-app, key: password}}
+        volumeMounts: [{name: ca, mountPath: /db-ca, readOnly: true}]
+      volumes: [{name: ca, secret: {secretName: wealthwise-db-ca}}]
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: {{ $name }}}
+spec:
+  selector: {app: {{ $name }}}
+  ports: [{name: http, port: 8080, targetPort: http}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: {{ $name }}}
+spec:
+  podSelector: {matchLabels: {app: {{ $name }}}}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    {{- if eq $name "ww-frontend" }}
+    - namespaceSelector: {matchLabels: {network.openshift.io/policy-group: ingress}}
+    {{- else }}
+    - podSelector: {matchLabels: {app: ww-frontend}}
+    {{- if eq $name "advisor-history" }}
+    - podSelector: {matchLabels: {app: financial-advisor}}
+    - podSelector: {matchLabels: {app: investment-advisor}}
+    {{- end }}
+    {{- end }}
+    ports: [{protocol: TCP, port: 8080}]
+{{- end }}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata: {name: wealthwise}
+spec:
+  {{- if .Values.routeHost }}
+  host: {{ .Values.routeHost | quote }}
+  {{- end }}
+  to: {kind: Service, name: ww-frontend}
+  port: {targetPort: http}
+  tls: {termination: edge, insecureEdgeTerminationPolicy: Redirect}
