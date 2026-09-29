@@ -15,6 +15,9 @@ metadata:
   description: ACME Bank financial guidance application with Keycloak sign-in and private history. Scripted demonstration; no live AI.
   tags: [quarkus, java, banking]
   annotations:
+{% if splunk_enabled | default(false) %}
+    demo-library.io/splunk-binding: wealthwise-demo
+{% endif %}
     backstage.io/source-location: url:https://github.com/relessawy/wealthwise-demo/tree/{{ source_ref }}
   links:
   - title: Open WealthWise
@@ -73,3 +76,39 @@ spec:
   system: wealthwise
   definition: |
     {{ openapi.json | combine({"servers":[{"url":application_url}]}) | to_nice_json | indent(4) }}
+{% if splunk_enabled | default(false) %}
+---
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: wealthwise-splunk-onboarding
+  title: Onboard WealthWise application logs
+  description: Register the deployed WealthWise application and open its authenticated Splunk view. Requires the configured Splunk integration. This does not create a second application deployment.
+spec:
+  owner: group:default/platform-admins
+  type: service
+  parameters: []
+  steps:
+  - id: lookup
+    name: Check whether WealthWise is already registered
+    action: catalog:fetch
+    input:
+      entityRef: component:default/wealthwise
+      optional: true
+  - id: register
+    if: '{{ '${{ not steps.lookup.output.entity }}' }}'
+    name: Register WealthWise and its approved observability binding
+    action: catalog:register
+    input:
+      catalogInfoUrl: https://bitbucket.org/{{ workspace }}/{{ repo_name }}/src/main/catalog-info.yaml
+  output:
+    links:
+    - title: Inspect WealthWise in Splunk
+      url: /catalog/default/component/wealthwise/splunk
+    - title: Open WealthWise
+      url: '{{ application_url }}'
+    - title: Run one controlled error (sign in to WealthWise first)
+      url: '{{ application_url }}/api/demo/operational-check?fail=true'
+    - title: Confirm healthy response
+      url: '{{ application_url }}/api/demo/operational-check?fail=false'
+{% endif %}

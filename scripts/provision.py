@@ -48,6 +48,8 @@ with tempfile.TemporaryDirectory() as tmp:
 configure(OC,NS,remote)
 if not local_build:
  ex("mvn","-B","-ntp","-f",remote+"/pom.xml","-Dmaven.repo.local=/work/m2","verify",container="maven")
+ # Dependency extraction is reproducible; retain source and test evidence, not per-run caches.
+ ex("rm","-rf",remote+"/ww-frontend/node_modules")
 images={}
 selected=set(os.environ.get("WEALTHWISE_BUILD_MODULES", ",".join(MODULES)).split(","))
 if not selected or not selected.issubset(MODULES): raise SystemExit("Invalid WEALTHWISE_BUILD_MODULES")

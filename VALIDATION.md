@@ -34,3 +34,10 @@ The prior baseline's negative network probes and database/history restart persis
 `docs/identity-catalog-qualification.json` contains sanitized automated evidence. Secrets and tokens remain outside Git.
 
 The Alice browser walkthrough exposed two issues that automated checks had missed: an authenticated callback could land on an unmapped URL, and the website catalog layout hid the API tab. A protected callback landing resource now redirects to the fixed application root; new acceptance checks verify its redirect and anonymous denial. The Quarkus backend-for-frontend is classified as a service, exposing its API tab. Both corrections were verified in the browser on 29 September 2026.
+
+## Optional Splunk increment 2026-09-29
+
+- Maven reactor verification passed for all four modules; frontend tests include controlled-error enablement and request event filtering.
+- Live frontend image digest: `sha256:8caa431aba628674da924358a1f8f630199a22c2a0ef0eece6c706e1e28f86fa` (build run 20260929T114011Z).
+- Shared integration acceptance run `20260929t121403-59215-24766` passed: authenticated healthy/error/healthy requests (200/500/200), exact failed request ID returned through the authenticated portal, unknown/injected entity denial, anonymous and forged-token denial, catalog-denied Dana/Evan, and completed onboarding template.
+- Splunk tab visually inspected while signed in as Alice. Full environment stop/start for this increment and independent-presenter validation remain pending.
