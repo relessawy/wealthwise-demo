@@ -50,6 +50,8 @@ The tools service account manages only the application namespace. If its image r
 
 The frontend accepts its OIDC session or a valid bearer token for this client. Issuer/signature/audience validation is performed by Quarkus. Secure HttpOnly cookies protect the session; API XHR requests receive an authentication failure instead of an HTML login page. The visible sign-in link starts the top-level code flow. Sign-out ends the application/Keycloak session; logging out of the shared identity provider can also affect subsequent sign-in to other applications.
 
+The callback also has a protected landing resource that redirects authenticated requests to the application root. This prevents a completed login from ending on an unmapped callback page and removes authorization parameters from the displayed URL. It does not process codes itself or bypass Quarkus authentication.
+
 The history owner is SHA-256 of the verified issuer and subject, not a supplied username/header. This remains stable if a username changes and separates identical subjects across realms. Alice and Bob have separate history. Internal services trust the authenticated frontend's identity only within their restricted NetworkPolicy boundary; cluster administrators remain trusted. Full end-to-end service identity is a later mesh milestone.
 
 The old baseline Secret `wealthwise-access` may remain on an upgraded installation, but no current Deployment references it and Basic/form password authentication is removed. Old `demo` history is retained in PostgreSQL and is not reassigned to Alice or Bob. No data migration or deletion is performed.
@@ -75,6 +77,8 @@ Automated checks cover code flow/PKCE, Alice/Bob identities, separate history, f
 Application source remains authoritative in the private `wealthwise-demo` GitHub repository. Ansible publishes only a generated `catalog-info.yaml` and README to a separate private `wealthwise-demo-catalog` repository in the portal's configured Bitbucket workspace/project. This is a catalog delivery artifact, not a second application implementation. It contains URLs and the public API contract, never credentials.
 
 Catalog source and handover links are pinned to the release in `VERSION`. The versioned Jinja template is `catalog/catalog.yaml.j2`; `deploy/catalog.yml` supplies actual environment values and reads the deployed OpenAPI document. Registration is idempotent for the exact location URL. Repeat publication compares content before committing. The catalog is stored persistently by the existing portal; foundation recreation requires rerunning `bash demo onboard`.
+
+The frontend is catalogued as a `service`: it is a Quarkus backend-for-frontend serving both the web interface and authenticated API. The portal's service layout exposes its provided API; a `website` classification uses a layout without that tab. After changing existing metadata, schedule an entity refresh and reload the component page.
 
 No TechDocs, CI, topology, Quay or Argo CD annotations are added to imply unfinished integrations. The handover and application links work independently of those later plugins. The existing generic Jenkins template remains available and unchanged.
 

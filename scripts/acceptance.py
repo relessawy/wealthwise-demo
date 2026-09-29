@@ -57,6 +57,10 @@ def main():
     bob=login(url,issuer,'bob',base64.b64decode(personas['bob']).decode())
     check('Alice authorization code with PKCE',alice.get(url+'/api/me',timeout=30).json()['username']=='alice')
     check('Bob authorization code with PKCE',bob.get(url+'/api/me',timeout=30).json()['username']=='bob')
+    landing=alice.get(url+'/oidc/callback',timeout=30,allow_redirects=False)
+    check('authenticated callback fallback returns home',landing.status_code==303 and urljoin(url,landing.headers.get('Location',''))==url+'/')
+    callback_anon=requests.get(url+'/oidc/callback',headers={'X-Requested-With':'XMLHttpRequest'},timeout=30,allow_redirects=False)
+    check('anonymous callback remains protected',callback_anon.status_code in (401,499))
     check('distinct verified subjects',alice.get(url+'/api/me',timeout=30).json()['identity']!=bob.get(url+'/api/me',timeout=30).json()['identity'])
     def post(s,path,body):return s.post(url+path,json=body,headers={'X-Requested-With':'XMLHttpRequest'},timeout=30,allow_redirects=False)
     rid=str(uuid.uuid4());body={'message':'How can I plan my household budget?','requestId':rid}

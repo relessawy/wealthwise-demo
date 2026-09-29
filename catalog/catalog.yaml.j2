@@ -27,7 +27,8 @@ metadata:
     url: https://github.com/relessawy/wealthwise-demo/blob/{{ source_ref }}/docs/IMPLEMENTATION.md
     icon: docs
 spec:
-  type: website
+  # The Quarkus frontend is also the authenticated backend-for-frontend API.
+  type: service
   lifecycle: experimental
   owner: group:default/developers
   system: wealthwise
