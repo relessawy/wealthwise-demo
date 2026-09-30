@@ -14,10 +14,22 @@
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <quarkus.platform.version>3.27.3</quarkus.platform.version>
+    <quarkus.platform.version>3.27.5.3</quarkus.platform.version>
   </properties>
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>com.fasterxml.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>2.21.7</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.parsson</groupId>
+        <artifactId>parsson</artifactId>
+        <version>1.1.8</version>
+      </dependency>
       <dependency>
         <groupId>io.quarkus.platform</groupId>
         <artifactId>quarkus-bom</artifactId>
@@ -66,4 +78,45 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>security-image</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.google.cloud.tools</groupId>
+            <artifactId>jib-maven-plugin</artifactId>
+            <version>3.4.5</version>
+            <configuration>
+              <from>
+                <image>docker.io/library/eclipse-temurin@sha256:bec16bceecb1a89defa333c77ac76d29a6b0d59fcb4f50218b476efa68e30bb4</image>
+              </from>
+              <to>
+                <image>wealthwise-frontend:security</image>
+              </to>
+              <container>
+                <user>185</user>
+                <entrypoint>
+                  <arg>java</arg>
+                  <arg>-jar</arg>
+                  <arg>/deployments/quarkus-run.jar</arg>
+                </entrypoint>
+                <ports>
+                  <port>8080</port>
+                </ports>
+              </container>
+              <extraDirectories>
+                <paths>
+                  <path>
+                    <from>${project.build.directory}/quarkus-app</from>
+                    <into>/deployments</into>
+                  </path>
+                </paths>
+              </extraDirectories>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
