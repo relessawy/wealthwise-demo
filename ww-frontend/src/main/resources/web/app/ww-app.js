@@ -5,6 +5,7 @@ import './ww-financial-advisor.js';
 import './ww-investment-recommendations.js';
 import './ww-footer.js';
 import './ww-history.js';
+import './ww-savings-guidance.js';
 
 class WwApp extends LitElement {
     static styles = css`
@@ -76,6 +77,7 @@ class WwApp extends LitElement {
             { path: '/', component: 'ww-financial-advisor' },
             { path: '/investment-recommendations', component: 'ww-investment-recommendations' },
             { path: '/history', component: 'ww-history' },
+            { path: '/savings', component: 'ww-savings-guidance' },
             { path: '(.*)', component: 'ww-financial-advisor' } // Default route / 404
         ]);
 
@@ -107,6 +109,8 @@ class WwApp extends LitElement {
                        class="${this.currentPath === '/investment-recommendations' ? 'active' : ''}">
                         Investment Recommendations
                     </a>
+                    <a href="/savings" @click=${this._navigate}
+                       class="${this.currentPath === '/savings' ? 'active' : ''}">Savings goal</a>
                     <a href="/history"
                        @click=${this._navigate}
                        class="${this.currentPath === '/history' ? 'active' : ''}">
