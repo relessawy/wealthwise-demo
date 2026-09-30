@@ -22,7 +22,7 @@ class WwSavingsGuidance extends LitElement {
     const data=new FormData(event.target);
     try {
       const response=await fetch('/api/savings-guidance?'+new URLSearchParams(data), {headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'}});
-      if (response.status===401 || response.redirected) throw new Error('Sign in to WealthWise, then calculate again.');
+      if (response.status===401 || response.status===499 || response.redirected) throw new Error('Sign in to WealthWise, then calculate again.');
       if (!response.ok) throw new Error(response.status===400 ? 'Check the amounts and number of months.' : 'The calculator is temporarily unavailable. Please retry.');
       this.result=await response.json();
     } catch(error) { this.error=error.message; } finally { this.busy=false; }
