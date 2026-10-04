@@ -71,12 +71,22 @@
   - name: Validate optional integration ownership
     ansible.builtin.assert:
       that: splunk_config.resources | length == 0 or splunk_config.resources[0].metadata.labels.get('demo-library.io/owner','') == owner
+  - name: Read optional Vault integration binding
+    kubernetes.core.k8s_info:
+      kind: ConfigMap
+      name: wealthwise-vault-integration
+      namespace: '{{ workload_namespace }}'
+    register: vault_config
+  - name: Validate Vault integration ownership
+    ansible.builtin.assert:
+      that: vault_config.resources | length == 0 or vault_config.resources[0].metadata.labels.get('demo-library.io/owner','') == 'vault-demo'
   - name: Deploy application
     kubernetes.core.helm:
       name: wealthwise
       chart_ref: '{{ playbook_dir }}/app'
       release_namespace: '{{ workload_namespace }}'
       release_values:
+        identitySecretName: '{{ vault_config.resources[0].data.identitySecretName if vault_config.resources | length else "wealthwise-oidc" }}'
         owner: '{{ owner }}'
         images: '{{ images }}'
         observability: '{{ (splunk_config.resources[0].data["values.json"] | from_json) if splunk_config.resources | length else {"enabled":false} }}'

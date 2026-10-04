@@ -6,3 +6,4 @@ nav:
   - Overview: index.md
   - Savings API: savings-api.md
   - WW-1 developer journey: developer-journey.md
+  - Secrets and integration health: secrets.md
