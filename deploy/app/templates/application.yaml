@@ -40,11 +40,11 @@ spec:
         {{- end }}
         {{- if eq $name "ww-frontend" }}
         - name: OIDC_ISSUER
-          valueFrom: {secretKeyRef: {name: wealthwise-oidc, key: issuer}}
+          valueFrom: {secretKeyRef: {name: {{ $.Values.identitySecretName | default "wealthwise-oidc" }}, key: issuer}}
         - name: OIDC_CLIENT_ID
-          valueFrom: {secretKeyRef: {name: wealthwise-oidc, key: client-id}}
+          valueFrom: {secretKeyRef: {name: {{ $.Values.identitySecretName | default "wealthwise-oidc" }}, key: client-id}}
         - name: OIDC_CLIENT_SECRET
-          valueFrom: {secretKeyRef: {name: wealthwise-oidc, key: client-secret}}
+          valueFrom: {secretKeyRef: {name: {{ $.Values.identitySecretName | default "wealthwise-oidc" }}, key: client-secret}}
         {{- end }}
         {{- if and (eq $name "ww-frontend") $.Values.observability.enabled }}
         volumeMounts: [{name: request-events, mountPath: /events}]

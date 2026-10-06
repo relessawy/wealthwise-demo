@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "2.3.0",
+  "metadata": {
+    "name": "wealthwise",
+    "version": "1.0.0",
+    "displayName": "WealthWise developer journey"
+  },
+  "components": [
+    {
+      "name": "tools",
+      "attributes": {
+        "controller.devfile.io/merge-contribution": true
+      },
+      "container": {
+        "image": "registry.redhat.io/devspaces/udi-rhel9@sha256:184f43b31b4bdc7ace01be27f6e57d5bb7cd9203226b5978f084ea0370f2d6f8",
+        "memoryLimit": "4Gi",
+        "memoryRequest": "512Mi",
+        "cpuLimit": "2",
+        "cpuRequest": "100m",
+        "mountSources": true,
+        "endpoints": [],
+        "env": [
+          {
+            "name": "JAVA_HOME",
+            "value": "/usr/lib/jvm/java-21-openjdk"
+          },
+          {
+            "name": "PATH",
+            "value": "/usr/lib/jvm/java-21-openjdk/bin:/home/user/.local/bin:/usr/share/maven/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          }
+        ]
+      }
+    }
+  ],
+  "commands": [
+    {
+      "id": "test",
+      "exec": {
+        "component": "tools",
+        "commandLine": "mvn -B -ntp verify",
+        "workingDir": "${PROJECT_SOURCE}",
+        "group": {
+          "kind": "test",
+          "isDefault": true
+        }
+      }
+    },
+    {
+      "id": "test-savings",
+      "exec": {
+        "component": "tools",
+        "commandLine": "mvn -B -ntp -pl ww-frontend -am test -Dtest=SavingsGuidanceTest -Dsurefire.failIfNoSpecifiedTests=false",
+        "workingDir": "${PROJECT_SOURCE}",
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        }
+      }
+    }
+  ]
+}

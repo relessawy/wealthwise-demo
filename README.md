@@ -38,3 +38,10 @@ Software-template creation, TechDocs/workspaces, multi-service Jenkins/SonarQube
 ## Source ownership
 
 [UPSTREAM.md](UPSTREAM.md) records the original source commit. No upstream application license was supplied; keep this repository private until redistribution permission is confirmed. Generic database assets are a versioned export from Demo-Library, not a separately maintained implementation.
+
+### Separate environment catalog
+
+Set `WEALTHWISE_CATALOG_REPOSITORY=demo2-wealthwise-catalog` before `bash demo all`
+when provisioning another environment in the same Bitbucket workspace. Publication
+and RHDH registration use that repository together. The default remains
+`wealthwise-demo-catalog`; use a new name to avoid updating the first environment.

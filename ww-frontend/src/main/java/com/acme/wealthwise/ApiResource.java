@@ -52,6 +52,18 @@ public class ApiResource {
   }
 
   @GET
+  @Path("/savings-guidance")
+  @org.eclipse.microprofile.openapi.annotations.Operation(
+      summary = "Calculate a savings contribution",
+      description = "Training calculator returning a monthly amount and general savings guidance. Uses the signed-in session or a bearer token.")
+  public SavingsGuidance.Result savings(
+      @QueryParam("target") @DefaultValue("1200.00") java.math.BigDecimal target,
+      @QueryParam("saved") @DefaultValue("300.00") java.math.BigDecimal saved,
+      @QueryParam("months") @DefaultValue("6") int months) {
+    return SavingsGuidance.calculate(target, saved, months);
+  }
+
+  @GET
   @Path("/history")
   public String history(
       @Context SecurityContext ctx,

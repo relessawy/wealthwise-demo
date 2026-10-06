@@ -15,6 +15,9 @@ metadata:
   description: ACME Bank financial guidance application with Keycloak sign-in and private history. Scripted demonstration; no live AI.
   tags: [quarkus, java, banking]
   annotations:
+{% if vault_enabled | default(false) %}
+    application-health.io/vault-binding: wealthwise-demo
+{% endif %}
 {% if splunk_enabled | default(false) %}
     demo-library.io/splunk-binding: wealthwise-demo
 {% endif %}
