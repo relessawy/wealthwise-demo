@@ -16,7 +16,7 @@ metadata:
   tags: [quarkus, java, banking]
   annotations:
 {% if vault_enabled | default(false) %}
-    application-health.io/vault-binding: wealthwise-demo
+    vault-health.io/vault-binding: wealthwise-demo
 {% endif %}
 {% if splunk_enabled | default(false) %}
     demo-library.io/splunk-binding: wealthwise-demo
