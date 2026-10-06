@@ -13,6 +13,7 @@ def main():
        'personas':{k:users['data'][k] for k in (('alice','bob') if mode=='app' else ('alice','carol'))},
        'url':'https://'+read('route','wealthwise',NS)['spec']['host']}
     if mode=='catalog':
+        c['catalog_repository']=os.environ.get('WEALTHWISE_CATALOG_REPOSITORY','wealthwise-demo-catalog')
         pns=os.environ['PORTAL_NAMESPACE'];pname=os.environ['PORTAL_NAME']
         c['portal_url']='https://'+read('route',pname,pns)['spec']['host']
         c['workspace']=base64.b64decode(read('secret',pname+'-bitbucket',pns)['data']['workspace']).decode()

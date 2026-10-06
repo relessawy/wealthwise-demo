@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Register and verify only this generated catalog location via the portal API."""
-import base64,importlib.util,json,os,pathlib,subprocess,time,sys
+import base64,importlib.util,json,os,pathlib,re,subprocess,time,sys
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('portal_identity',ROOT/'deploy/vendor/verification/portal_identity.py')
 identity=importlib.util.module_from_spec(spec);spec.loader.exec_module(identity)
 OC=os.environ.get('OC','oc')
 def get(kind,name,ns):return json.loads(subprocess.check_output([OC,'get',kind,name,'-n',ns,'-o','json']))
 def main():
+    repository=os.environ.get('WEALTHWISE_CATALOG_REPOSITORY','wealthwise-demo-catalog')
     if '--stdin' in sys.argv:
-        c=json.load(sys.stdin);url=c['portal_url'];issuer=c['issuer'];s={'data':c['personas']};workspace=c['workspace']
+        c=json.load(sys.stdin);url=c['portal_url'];issuer=c['issuer'];s={'data':c['personas']};workspace=c['workspace'];repository=c.get('catalog_repository',repository)
     else:
         pns=os.environ['PORTAL_NAMESPACE'];pname=os.environ['PORTAL_NAME'];ins=os.environ['IDENTITY_NAMESPACE'];iname=os.environ['IDENTITY_NAME'];realm=os.environ['IDENTITY_REALM']
         url='https://'+get('route',pname,pns)['spec']['host']
@@ -16,8 +17,9 @@ def main():
         s=get('secret',iname+'-personas',ins)
         assert s['metadata'].get('labels',{}).get('demo-library.io/owner')=='identity-foundation','Foreign identity inputs'
         bb=get('secret',pname+'-bitbucket',pns)['data'];workspace=base64.b64decode(bb['workspace']).decode()
+    if not re.fullmatch(r'[a-z0-9][a-z0-9_-]{0,61}',repository):raise ValueError('Invalid catalog repository slug')
     session,headers=identity.login(url,issuer,'carol',base64.b64decode(s['data']['carol']).decode())
-    target='https://bitbucket.org/'+workspace+'/wealthwise-demo-catalog/src/main/catalog-info.yaml'
+    target='https://bitbucket.org/'+workspace+'/'+repository+'/src/main/catalog-info.yaml'
     r=session.get(url+'/api/catalog/locations',headers=headers,timeout=30);r.raise_for_status()
     found=[x for x in r.json() if x.get('data',x).get('target')==target]
     if not found:
