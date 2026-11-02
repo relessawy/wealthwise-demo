@@ -1,6 +1,6 @@
 # WealthWise Demo
 
-A private adaptation of WealthWise for a fictional ACME Bank. The original application is unchanged. The existing Lit/Vaadin interface is retained, with four independently deployable Quarkus services and a dedicated PostgreSQL database.
+WealthWise is an application developed by Ramy ElEssawy for a fictional ACME Bank demo. The original application is unchanged. The existing Lit/Vaadin interface is retained, with four independently deployable Quarkus services and a dedicated PostgreSQL database.
 
 ## Demo story
 
@@ -37,4 +37,4 @@ Software-template creation, TechDocs/workspaces, multi-service Jenkins/SonarQube
 
 ## Source ownership
 
-[UPSTREAM.md](UPSTREAM.md) records the original source commit. No upstream application license was supplied; keep this repository private until redistribution permission is confirmed. Generic database assets are a versioned export from Demo-Library, not a separately maintained implementation.
+[UPSTREAM.md](UPSTREAM.md) records the application ownership and original source commit. Generic database assets retain their own provenance and license records.
