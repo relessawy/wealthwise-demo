@@ -1,0 +1,9 @@
+site_name: WealthWise
+site_description: ACME Bank developer and API guide
+plugins:
+  - techdocs-core
+nav:
+  - Overview: index.md
+  - Savings API: savings-api.md
+  - WW-1 developer journey: developer-journey.md
+  - Secrets and integration health: secrets.md
